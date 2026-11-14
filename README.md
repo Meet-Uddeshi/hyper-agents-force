@@ -29,8 +29,8 @@
   - [3. Installation via NPM / NPX](#3-installation-via-npm--npx)
 - [CLI Reference](#cli-reference)
 - [MCP Configuration & Tool Connection](#mcp-configuration--tool-connection)
-- [Prompt Templates & Usage Patterns](#prompt-templates--usage-patterns)
-  - [Standard Agent Invocation Template](#standard-agent-invocation-template)
+- [Prompt Templates & Examples](#prompt-templates--examples)
+  - [Standard Prompt Template](#standard-prompt-template)
   - [Example 1: Complex System Architecture](#example-1-complex-system-architecture)
   - [Example 2: Systematic Debugging & Root Cause Analysis](#example-2-systematic-debugging--root-cause-analysis)
   - [Example 3: AI & Machine Learning Pipeline Engineering](#example-3-ai--machine-learning-pipeline-engineering)
@@ -329,16 +329,13 @@ Ready servers display `[READY]`, while unconfigured servers list their missing e
 
 ---
 
-## Prompt Templates & Usage Patterns
+## Prompt Templates & Examples
 
-### Standard Agent Invocation Template
+### Standard Prompt Template
 
-Copy and fill this structured format when prompting Antigravity, Gemini CLI, or Claude Code to achieve maximum precision:
+Use this structured prompt format when interacting with Antigravity, Gemini CLI, or Claude Code. You do **not** need to manually specify agent names or skills—the runtime's Intelligent Routing Engine autonomously resolves the optimal specialist agent and injects the required skills based on your task and context:
 
 ```markdown
-Role: {Agent Name, e.g., Database Architect}
-Skills: {Skill 1, Skill 2, e.g., database-design, prisma-patterns}
-
 Task:
 {Clear 1-2 sentence description of what needs to be accomplished}
 
@@ -361,16 +358,15 @@ Verification:
 
 ### Example 1: Complex System Architecture
 
+#### User Prompt:
 ```markdown
-Role: Code Architect
-Skills: clean-code, architecture, architecture-decision-records, hexagonal-architecture
-
 Task:
 Refactor our monolithic order processing service into a decoupled Hexagonal (Ports & Adapters) architecture.
 
 Context:
-- Current files: src/services/OrderService.ts (contains database calls, Stripe API calls, and email dispatch).
-- Target: Isolate core domain logic from infrastructure adapters.
+- Project Tech Stack: Node.js, TypeScript, PostgreSQL, Stripe SDK
+- Constraints: Zero breaking changes to public API, isolate domain logic from infrastructure adapters
+- Relevant Files: src/services/OrderService.ts
 
 Deliverables:
 1. Domain entity models and repository interfaces (Ports).
@@ -383,73 +379,99 @@ Verification:
 - Verify no infrastructure dependencies are imported inside the domain core.
 ```
 
+#### Autonomous Execution Result:
+* **Autonomous Agent**: `code-architect`
+* **Auto-Injected Skills**: `clean-code`, `architecture`, `architecture-decision-records`, `hexagonal-architecture`
+* **Autonomous Actions**: Scans structural call hierarchy, isolates ports and adapters, writes domain entities with zero external dependencies, generates ADR-004, and validates build and test pipelines.
+
 ---
 
 ### Example 2: Systematic Debugging & Root Cause Analysis
 
+#### User Prompt:
 ```markdown
-Role: Debugger
-Skills: systematic-debugging, root-cause-tracing, clean-code
-
 Task:
 Investigate and resolve a memory leak occurring during bulk CSV data imports in production.
 
 Context:
-- Error: Node.js process crashes with JavaScript heap out of memory after ~5,000 records.
-- Relevant file: src/workers/importer.ts
+- Project Tech Stack: Node.js, TypeScript, PostgreSQL
+- Current Behavior: Process crashes with JavaScript heap out of memory after importing ~5,000 records
+- Relevant Files: src/workers/importer.ts
 
-Mandatory Protocol:
-1. Phase 1: Isolate the leak without changing production code. Formulate an evidence-based hypothesis.
-2. Phase 2: Create a minimal reproducing test case that fails deterministically.
-3. Phase 3: Implement the fix using stream-based chunk processing.
-4. Phase 4: Run the test to confirm memory stabilization and verify zero regression.
+Deliverables:
+1. Minimal reproducing test case demonstrating heap exhaustion.
+2. Stream-based chunk processing fix preventing memory accumulation.
+3. Memory profiling evidence confirming heap stability under 50,000 rows.
+
+Verification:
+- Run npm test tests/importer.test.ts
+- Verify heap allocation remains under 120 MB throughout execution.
 ```
+
+#### Autonomous Execution Result:
+* **Autonomous Agent**: `debugger`
+* **Auto-Injected Skills**: `systematic-debugging`, `root-cause-tracing`, `clean-code`
+* **Autonomous Actions**: Executes 4-phase debugging protocol: isolates leak without modifying production code, writes deterministic reproduction test, refactors to backpressure-aware Node stream pipeline, and confirms memory stabilization.
 
 ---
 
 ### Example 3: AI & Machine Learning Pipeline Engineering
 
+#### User Prompt:
 ```markdown
-Role: AI Engineer
-Skills: agentic-frameworks, context-engineering, cost-aware-llm-pipeline, rag-pipeline-reviewer
-
 Task:
-Build a multi-agent research assistant pipeline using LangGraph with persistent SQLite checkpointing and vector search retrieval.
+Build an agentic research assistant pipeline in LangGraph with persistent SQLite checkpointing and semantic vector retrieval.
 
 Context:
-- Models: Gemini 2.0 Flash / Pro
-- Vector Store: ChromaDB / pgvector
-- Requirements: Bounded context window, structured JSON output, citation verification.
+- Project Tech Stack: Python 3.11, LangGraph, ChromaDB, Gemini 2.0 Flash
+- Constraints: Bounded context window, structured JSON output, citation verification
+- Relevant Files: src/agents/researcher.py, src/pipeline/graph.py
 
 Deliverables:
 1. StateGraph implementation with researcher and reviewer agent nodes.
-2. SQLite checkpoint saver for interrupt-and-resume workflows.
-3. Eval benchmark evaluating retrieval faithfulness and answer relevance.
+2. SQLite checkpoint saver for interrupt-and-resume execution.
+3. Evaluation benchmark verifying retrieval faithfulness and answer relevance.
 
 Verification:
 - Run pytest tests/test_agent_pipeline.py
-- Verify latency and token consumption metrics.
+- Verify latency and token consumption metrics remain within budget.
 ```
+
+#### Autonomous Execution Result:
+* **Autonomous Agent**: `ai-engineer`
+* **Auto-Injected Skills**: `agentic-frameworks`, `context-engineering`, `production-rag`, `inference-engineering`
+* **Autonomous Actions**: Compiles StateGraph with cyclical review loop, configures SQLite checkpointing saver, implements token-bounded RAG retrieval, and executes evaluation benchmark.
 
 ---
 
 ### Example 4: Multi-Agent Parallel Orchestration
 
+#### User Prompt:
 ```markdown
-Role: Orchestrator
-Skills: parallel-agents, multi-agent-orchestration, task-coordination
-
 Task:
-Coordinate a parallel full-stack feature release: create the database schema, develop the backend API endpoints, and build the accessible React UI component simultaneously.
+Coordinate a parallel full-stack feature release: create the database migration, implement the REST API endpoints, and build the responsive dark-mode React dashboard component simultaneously.
 
-Coordination Plan:
-1. Agent 1 (Database Architect): Author migration schema in src/db/schema.prisma.
-2. Agent 2 (Backend Specialist): Implement REST endpoints in src/api/routes.ts using mock repository until schema lands.
-3. Agent 3 (Frontend Specialist): Build UI component in src/components/Dashboard.tsx matching design guidelines.
-4. Agent 4 (QA Specialist): Execute end-to-end integration test validating end-to-end contract.
+Context:
+- Project Tech Stack: PostgreSQL, Prisma, Express/TypeScript, React 19, Tailwind CSS
+- Constraints: Independent parallel execution across modules with verified integration
+- Relevant Files: prisma/schema.prisma, src/api/routes.ts, src/components/Dashboard.tsx
 
-Log state transitions to .agent/context/BLACKBOARD.md after each phase completion.
+Deliverables:
+1. Database schema migration with optimized foreign key indexes.
+2. REST API endpoints with request validation middleware.
+3. Responsive dashboard UI component adhering to design standards.
+4. End-to-end integration test validating full contract.
+
+Verification:
+- Run npx prisma validate
+- Run npm run build
+- Run npm test tests/e2e/feature.test.ts
 ```
+
+#### Autonomous Execution Result:
+* **Autonomous Agent**: `orchestrator`
+* **Auto-Injected Skills**: `parallel-agents`, `multi-agent-orchestration`, `task-coordination`
+* **Autonomous Actions**: Dispatches parallel subagents (`database-architect` for schema, `backend-specialist` for API, `frontend-specialist` for UI), orchestrates dependency ordering, writes real-time event telemetry to `.agent/context/BLACKBOARD.md`, and runs integration verification.
 
 ---
 
@@ -492,9 +514,3 @@ Expected result:
 ======================= 16 passed in 5.90s =======================
 TEST RUN COMPLETED: Passed: 110 / 110 (100.0%)
 ```
-
----
-
-## License
-
-This software and custom agent configurations are proprietary and maintained for personal and private enterprise use (**UNLICENSED**). All rights reserved.
