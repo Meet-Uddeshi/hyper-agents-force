@@ -1,0 +1,40 @@
+{
+  "name": "hyper-agents-force",
+  "version": "1.0.0",
+  "description": "Hyper Agents Force - Autonomous Multi-Agent System, Intelligent Routing Engine, and Enterprise MCP Platform",
+  "main": "bin/meet-ai-agents.js",
+  "bin": {
+    "hyper-agents-force": "./bin/meet-ai-agents.js",
+    "hyper": "./bin/meet-ai-agents.js",
+    "meet-ai-agents": "./bin/meet-ai-agents.js",
+    "meet-ai": "./bin/meet-ai-agents.js",
+    "meet": "./bin/meet-ai-agents.js"
+  },
+  "files": [
+    "bin",
+    ".agent",
+    "global-rules",
+    "GEMINI.md",
+    ".env.example"
+  ],
+  "scripts": {
+    "test": "python .agent/scripts/test_workflow_engine.py && python .agent/scripts/test_all_108_agents.py",
+    "doctor": "node bin/meet-ai-agents.js doctor",
+    "mcp:list": "node bin/meet-ai-agents.js mcp"
+  },
+  "keywords": [
+    "agents",
+    "multi-agent",
+    "skills",
+    "workflows",
+    "antigravity",
+    "mcp",
+    "automation",
+    "hyper-agents-force",
+    "hyper-agents"
+  ],
+  "author": "Meet Uddeshi",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

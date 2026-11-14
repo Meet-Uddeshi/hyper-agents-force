@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hyper-agents-force"
+version = "1.0.0"
+description = "Hyper Agents Force - Autonomous Multi-Agent System, Intelligent Routing Engine, and Enterprise MCP Platform"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "Meet Uddeshi" }
+]
+keywords = ["agents", "multi-agent", "skills", "workflows", "antigravity", "mcp", "automation", "hyper-agents-force", "hyper-agents"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance"
+]
+
+[project.scripts]
+hyper-agents-force = "bin.cli:main"
+hyper = "bin.cli:main"
+meet-ai-agents = "bin.cli:main"
+meet-ai = "bin.cli:main"
+meet = "bin.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bin*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.*"]
