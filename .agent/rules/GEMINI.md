@@ -24,7 +24,7 @@ For non-trivial features, deep debugging, or architectural changes where no solu
 
 ---
 
-## 📥 REQUEST CLASSIFIER (STEP 1)
+##  REQUEST CLASSIFIER (STEP 1)
 
 **Before ANY action, classify the request:**
 
@@ -39,11 +39,11 @@ For non-trivial features, deep debugging, or architectural changes where no solu
 
 ---
 
-## 🤖 INTELLIGENT AGENT ROUTING (STEP 2 - AUTO)
+##  INTELLIGENT AGENT ROUTING (STEP 2 - AUTO)
 
 **ALWAYS ACTIVE: Before responding to ANY request, automatically analyze and select the best agent(s).**
 
-> 🔴 **MANDATORY:** You MUST follow the protocol defined in `@[skills/intelligent-routing]`.
+>  **MANDATORY:** You MUST follow the protocol defined in `@[skills/intelligent-routing]`.
 
 ### Auto-Selection Protocol
 
@@ -57,7 +57,7 @@ For non-trivial features, deep debugging, or architectural changes where no solu
 When auto-applying an agent, inform the user:
 
 ```markdown
-🤖 **Applying knowledge of `@[agent-name]`...**
+ **Applying knowledge of `@[agent-name]`...**
 
 [Continue with specialized response]
 ```
@@ -68,7 +68,7 @@ When auto-applying an agent, inform the user:
 2. **Respect Overrides**: If user mentions `@agent`, use it.
 3. **Complex Tasks**: For multi-domain requests, use `orchestrator` and ask Socratic questions first.
 
-### ⚠️ AGENT ROUTING CHECKLIST (MANDATORY BEFORE EVERY CODE/DESIGN RESPONSE)
+### ️ AGENT ROUTING CHECKLIST (MANDATORY BEFORE EVERY CODE/DESIGN RESPONSE)
 
 **Before ANY code or design work, you MUST complete this mental checklist:**
 
@@ -76,19 +76,19 @@ When auto-applying an agent, inform the user:
 |------|-------|--------------|
 | 1 | Did I identify the correct agent for this domain? | → STOP. Analyze request domain first. |
 | 2 | Did I READ the agent's `.md` file (or recall its rules)? | → STOP. Open `.agent/agents/{agent}.md` |
-| 3 | Did I announce `🤖 Applying knowledge of @[agent]...`? | → STOP. Add announcement before response. |
+| 3 | Did I announce ` Applying knowledge of @[agent]...`? | → STOP. Add announcement before response. |
 | 4 | Did I load required skills from agent's frontmatter? | → STOP. Check `skills:` field and read them. |
 
 **Failure Conditions:**
 
-- ❌ Writing code without identifying an agent = **PROTOCOL VIOLATION**
-- ❌ Skipping the announcement = **USER CANNOT VERIFY AGENT WAS USED**
-- ❌ Ignoring agent-specific rules (e.g., Purple Ban) = **QUALITY FAILURE**
+-  Writing code without identifying an agent = **PROTOCOL VIOLATION**
+-  Skipping the announcement = **USER CANNOT VERIFY AGENT WAS USED**
+-  Ignoring agent-specific rules (e.g., Purple Ban) = **QUALITY FAILURE**
 
-> 🔴 **Self-Check Trigger:** Every time you are about to write code or create UI, ask yourself:
+>  **Self-Check Trigger:** Every time you are about to write code or create UI, ask yourself:
 > "Have I completed the Agent Routing Checklist?" If NO → Complete it first.
 
-### 🎯 COMPREHENSIVE PROMPT-TRIGGER AGENT MATRIX (108 AGENTS)
+###  COMPREHENSIVE PROMPT-TRIGGER AGENT MATRIX (108 AGENTS)
 
 The full 95-Agent Prompt Trigger Matrix across all 10 engineering domains is modularized in [gent-matrix.md](./agent-matrix.md) (automatically active on all requests via 	rigger: always_on):
 
@@ -121,7 +121,7 @@ ag-pipeline-reviewer, marketing-agent, healthcare-reviewer, engali-reviewer, ge
 
 ## TIER 0: UNIVERSAL RULES (Always Active)
 
-### 🌐 Language Handling
+###  Language Handling
 
 When user's prompt is NOT in English:
 
@@ -129,7 +129,7 @@ When user's prompt is NOT in English:
 2. **Respond in user's language** - match their communication
 3. **Code comments/variables** remain in English
 
-### 🧹 Clean Code (Global Mandatory)
+###  Clean Code (Global Mandatory)
 
 **ALL code MUST follow `@[skills/clean-code]` rules. No exceptions.**
 
@@ -138,7 +138,7 @@ When user's prompt is NOT in English:
 - **Performance**: Measure first. Adhere to 2025 standards (Core Web Vitals).
 - **Infra/Safety**: 5-Phase Deployment. Verify secrets security.
 
-### 📁 File Dependency Awareness
+###  File Dependency Awareness
 
 **Before modifying ANY file:**
 
@@ -146,9 +146,9 @@ When user's prompt is NOT in English:
 2. Identify dependent files
 3. Update ALL affected files together
 
-### 🗺️ System Map Read
+### ️ System Map Read
 
-> 🔴 **MANDATORY:** Read `ARCHITECTURE.md` at session start to understand Agents, Skills, and Scripts.
+>  **MANDATORY:** Read `ARCHITECTURE.md` at session start to understand Agents, Skills, and Scripts.
 
 **Path Awareness:**
 
@@ -156,11 +156,11 @@ When user's prompt is NOT in English:
 - Skills: `.agent/skills/` (Project)
 - Runtime Scripts: `.agent/skills/<skill>/scripts/`
 
-### 🧠 Read → Understand → Apply
+###  Read → Understand → Apply
 
 ```
-❌ WRONG: Read agent file → Start coding
-✅ CORRECT: Read → Understand WHY → Apply PRINCIPLES → Code
+ WRONG: Read agent file → Start coding
+ CORRECT: Read → Understand WHY → Apply PRINCIPLES → Code
 ```
 
 **Before coding, answer:**
@@ -173,7 +173,7 @@ When user's prompt is NOT in English:
 
 ## TIER 1: CODE RULES (When Writing Code)
 
-### 📱 Project Type Routing
+###  Project Type Routing
 
 | Project Type                           | Primary Agent         | Skills                        |
 | -------------------------------------- | --------------------- | ----------------------------- |
@@ -181,9 +181,9 @@ When user's prompt is NOT in English:
 | **WEB** (Next.js, React web)           | `frontend-specialist` | frontend-design               |
 | **BACKEND** (API, server, DB)          | `backend-specialist`  | api-patterns, database-design |
 
-> 🔴 **Mobile + frontend-specialist = WRONG.** Mobile = mobile-developer ONLY.
+>  **Mobile + frontend-specialist = WRONG.** Mobile = mobile-developer ONLY.
 
-### 🛑 Socratic Gate & Zero-Assumption Mandate (MANDATORY FOR ALL AGENTS)
+###  Socratic Gate & Zero-Assumption Mandate (MANDATORY FOR ALL AGENTS)
 
 > **UNIVERSAL RULE:** If ANY agent has ANY doubt or ambiguity to make the correct decision, the agent MUST STOP and ask the user. Agents must NEVER assume, speculate, or guess to blindly continue work.
 
@@ -205,7 +205,7 @@ When user's prompt is NOT in English:
 3. **No Speculative Coding:** Do not write speculative code based on unconfirmed guesses. Wait for explicit user confirmation.
 4. **Bypass on Simple:** If the task is clear, unambiguous, or surgical, execute directly without unnecessary questions.
 
-### 🏁 Final Checklist Protocol
+###  Final Checklist Protocol
 
 **Trigger:** When the user says "son kontrolleri yap", "final checks", "çalıştır tüm testleri", or similar phrases.
 
@@ -240,9 +240,9 @@ When user's prompt is NOT in English:
 | `lighthouse_audit.py`      | performance-profiling | Before deploy       |
 | `playwright_runner.py`     | webapp-testing        | Before deploy       |
 
-> 🔴 **Agents & Skills can invoke ANY script** via `python .agent/skills/<skill>/scripts/<script>.py`
+>  **Agents & Skills can invoke ANY script** via `python .agent/skills/<skill>/scripts/<script>.py`
 
-### 🎭 Gemini Mode Mapping
+###  Gemini Mode Mapping
 
 | Mode     | Agent             | Behavior                                     |
 | -------- | ----------------- | -------------------------------------------- |
@@ -257,7 +257,7 @@ When user's prompt is NOT in English:
 3. SOLUTIONING → Architecture, design (NO CODE!)
 4. IMPLEMENTATION → Code + tests
 
-> 🔴 **Edit mode:** If multi-file or structural change → Offer to create `{task-slug}.md`. For single-file fixes → Proceed directly.
+>  **Edit mode:** If multi-file or structural change → Offer to create `{task-slug}.md`. For single-file fixes → Proceed directly.
 
 ---
 
@@ -277,11 +277,11 @@ When user's prompt is NOT in English:
 - Anti-cliché rules
 - Deep Design Thinking protocol
 
-> 🔴 **For design work:** Open and READ the agent file. Rules are there.
+>  **For design work:** Open and READ the agent file. Rules are there.
 
 ---
 
-## 📁 QUICK REFERENCE (108 AGENTS & 365+ SKILLS)
+##  QUICK REFERENCE (108 AGENTS & 365+ SKILLS)
 
 ### 10 Core Agent Clusters
 

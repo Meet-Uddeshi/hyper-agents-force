@@ -119,6 +119,27 @@ def test_python_cli():
     assert ans_res["selected_agent"] == "reverse-engineering-anything"
     print("  [PASS] Python meet answer generation")
 
+    # 9. Collaborative Agent Team Route via meet CLI
+    out = run_cmd(["python", "-m", "bin.cli", "team", "route", "$team:fullstack Build complete SaaS app", "--json"])
+    route_res = json.loads(out)
+    assert route_res["system"] == "team"
+    assert route_res["mode"] == "EXPLICIT_TEAM_PREFIX"
+    assert route_res["identifier"] == "fullstack"
+    print("  [PASS] Python meet team route intent classification")
+
+    # 10. Agent Team Board Generation via meet CLI
+    out = run_cmd(["python", "-m", "bin.cli", "team", "board", "--id", "team-demo", "--json"])
+    board_res = json.loads(out)
+    assert board_res["team"]["team_id"] == "team-demo"
+    assert "tasks" in board_res
+    print("  [PASS] Python meet team board synchronization")
+
+    # 11. Human-in-the-Loop (HITL) Checkpoint Listing via meet CLI
+    out = run_cmd(["python", "-m", "bin.cli", "hitl", "list", "--json"])
+    hitl_res = json.loads(out)
+    assert isinstance(hitl_res, list)
+    print("  [PASS] Python meet hitl list checkpoint querying")
+
 
 def main():
     print("================================================================================")

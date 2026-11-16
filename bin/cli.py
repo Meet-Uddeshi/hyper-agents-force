@@ -13,6 +13,8 @@ Usage:
   meet run <workflow>           # Execute workflow automation
   meet answer "<query>"         # Generate structured workflow answer
   meet list [workflows|agents]  # List catalog entries
+  meet team board --id <team>   # Display shared team task board & synchronize
+  meet hitl list                # Checkpoints awaiting human verification
   meet doctor                   # Health check of workspace, agents & MCP
 """
 
@@ -22,22 +24,29 @@ import argparse
 import json
 from pathlib import Path
 
-try:
-    from bin.installer import Installer
-    from bin.mcp_manager import McpManager
-    from bin.memory_manager import MemoryManager
-except ImportError:
-    from installer import Installer
-    from mcp_manager import McpManager
-    from memory_manager import MemoryManager
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = SCRIPT_DIR.parent
 AGENT_DIR = WORKSPACE_DIR / ".agent"
 SCRIPTS_DIR = AGENT_DIR / "scripts"
 
-# Import workflow engine if available
+sys.path.insert(0, str(WORKSPACE_DIR))
+sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(SCRIPTS_DIR))
+
+try:
+    from bin.installer import Installer
+    from bin.mcp_manager import McpManager
+    from bin.memory_manager import MemoryManager
+    from bin.team_engine import TeamEngine
+    from bin.hitl_middleware import HitlMiddleware
+except ImportError:
+    from installer import Installer
+    from mcp_manager import McpManager
+    from memory_manager import MemoryManager
+    from team_engine import TeamEngine
+    from hitl_middleware import HitlMiddleware
+
+# Import workflow engine if available
 try:
     from workflow_engine import WorkflowEngine
 except ImportError:
@@ -189,6 +198,10 @@ def handle_memory(args):
             print(f"- Database Size: {stats['size_kb']} KB ({stats['size_bytes']} bytes)")
             print(f"- Total Memories: {stats['total_memories']}")
             print(f"- Total Blackboard Events: {stats['total_events']}")
+            print(f"- Total Active Teams: {stats.get('total_teams', 0)}")
+            print(f"- Total Team Tasks: {stats.get('total_team_tasks', 0)}")
+            print(f"- Total Team Messages: {stats.get('total_team_messages', 0)}")
+            print(f"- Total HITL Checkpoints: {stats.get('total_hitl', 0)} (Pending: {stats.get('pending_hitl', 0)})")
             print("- Categories Breakdown:")
             for cat, count in stats.get("categories", {}).items():
                 print(f"  * {cat}: {count}")
@@ -217,6 +230,240 @@ def handle_memory(args):
                 print(f"   {e['description']}\n")
     else:
         print("Usage: meet memory [init|log|query|sync|stats|prune|events]")
+
+
+def handle_team(args):
+    engine = TeamEngine()
+    subcmd = args.team_command
+
+    if subcmd == "create":
+        members = []
+        if args.members:
+            try:
+                parsed = json.loads(args.members)
+                if isinstance(parsed, list):
+                    for m in parsed:
+                        if isinstance(m, str):
+                            members.append({"agent_name": m, "role_description": "Team Specialist", "skills": []})
+                        elif isinstance(m, dict):
+                            members.append(m)
+            except Exception:
+                for name in args.members.split(","):
+                    name = name.strip()
+                    if name:
+                        members.append({"agent_name": name, "role_description": "Team Specialist", "skills": []})
+
+        tid = engine.create_team(
+            team_id=args.id,
+            team_name=args.name,
+            lead_agent=args.lead,
+            objective=args.objective,
+            members=members
+        )
+        board = engine.get_board_data(tid)
+        if args.json:
+            print(json.dumps(board, indent=2))
+        else:
+            team_meta = board.get("team") or {}
+            print(f"\nCreated Collaborative Agent Team: {team_meta.get('team_name', args.name)} [{tid}]")
+            print(f"- Lead Agent: {team_meta.get('lead_agent', args.lead)}")
+            print(f"- Objective: {team_meta.get('objective', args.objective)}")
+            print(f"- Members: {len(board.get('members', []))}\n")
+
+    elif subcmd == "task-add":
+        deps = [d.strip() for d in args.deps.split(",") if d.strip()] if args.deps else []
+        task = engine.add_task(
+            team_id=args.id,
+            title=args.title,
+            description=args.desc,
+            depends_on=deps,
+            task_id=args.task_id
+        )
+        if args.json:
+            print(json.dumps(task, indent=2))
+        else:
+            print(f"\nAdded Task to Team '{args.id}': [{task['task_id']}] {task['title']}")
+            print(f"- Status: {task['status']}")
+            print(f"- Dependencies: {task['depends_on']}\n")
+
+    elif subcmd == "tasks":
+        if args.unblocked:
+            tasks = engine.get_unblocked_tasks(args.id)
+            title_prefix = "Unblocked / Ready"
+        else:
+            board = engine.get_board_data(args.id)
+            tasks = board.get("tasks", [])
+            title_prefix = "All"
+
+        if args.json:
+            print(json.dumps(tasks, indent=2))
+        else:
+            print(f"\nTeam '{args.id}' {title_prefix} Tasks ({len(tasks)}):\n")
+            for t in tasks:
+                claimed = f" [Claimed: {t['claimed_by']}]" if t.get("claimed_by") else ""
+                print(f"- [{t['task_id']}] ({t['status']}){claimed} {t['title']}")
+                print(f"  Description: {t['description']}")
+            print()
+
+    elif subcmd == "claim":
+        success = engine.claim_task(team_id=args.id, task_id=args.task_id, agent_name=args.agent)
+        if args.json:
+            print(json.dumps({"success": success, "team_id": args.id, "task_id": args.task_id, "agent": args.agent}))
+        else:
+            if success:
+                print(f"\nTask [{args.task_id}] successfully claimed by agent @{args.agent} in team '{args.id}'.\n")
+            else:
+                print(f"\nFailed to claim task [{args.task_id}]. It may be blocked or already claimed.\n", file=sys.stderr)
+                sys.exit(1)
+
+    elif subcmd == "complete":
+        outs = [o.strip() for o in args.outputs.split(",") if o.strip()] if args.outputs else []
+        success = engine.complete_task(team_id=args.id, task_id=args.task_id, agent_name=args.agent, output_artifacts=outs)
+        if args.json:
+            print(json.dumps({"success": success, "team_id": args.id, "task_id": args.task_id, "agent": args.agent}))
+        else:
+            if success:
+                print(f"\nTask [{args.task_id}] completed by agent @{args.agent}. Dependent tasks unblocked.\n")
+            else:
+                print(f"\nFailed to complete task [{args.task_id}]. Verify agent ownership and task status.\n", file=sys.stderr)
+                sys.exit(1)
+
+    elif subcmd == "msg":
+        msg_id = engine.send_message(
+            team_id=args.id,
+            from_agent=args.from_agent,
+            to_agent=args.to_agent,
+            content=args.content,
+            reply_to=args.reply_to
+        )
+        if args.json:
+            print(json.dumps({"success": True, "message_id": msg_id}))
+        else:
+            print(f"\nMessage #{msg_id} delivered from @{args.from_agent} to @{args.to_agent} in team '{args.id}'.\n")
+
+    elif subcmd == "board":
+        if args.sync:
+            synced_file = engine.sync_markdown_board(args.id)
+            if not args.json:
+                print(f"Synchronized Team Board to Markdown: {synced_file}\n")
+        if args.json:
+            print(json.dumps(engine.get_board_data(args.id), indent=2))
+        else:
+            print(engine.render_markdown_board(args.id))
+
+    elif subcmd == "route":
+        classification = TeamEngine.classify_prompt_intent(args.prompt)
+        if args.json:
+            print(json.dumps(classification, indent=2))
+        else:
+            print("\nAutonomous Prompt Intent Classification:")
+            print(f"- Selected System: {classification['system'].upper()}")
+            print(f"- Detection Mode: {classification['mode']}")
+            print(f"- Identifier: {classification['identifier']}")
+            print(f"- Confidence: {classification['confidence']:.2f}\n")
+
+    elif subcmd == "list":
+        teams = engine.list_teams()
+        if args.json:
+            print(json.dumps(teams, indent=2))
+        else:
+            print(f"\nRegistered Collaborative Agent Teams ({len(teams)}):\n")
+            for t in teams:
+                print(f"- [{t['team_id']}] {t['team_name']} (Lead: @{t['lead_agent']}, Status: {t['status']})")
+                print(f"  Objective: {t['objective']}\n")
+    else:
+        print("Usage: meet team [create|list|task-add|tasks|claim|complete|msg|board|route]")
+
+
+def handle_hitl(args):
+    middleware = HitlMiddleware()
+    subcmd = args.hitl_command
+
+    if subcmd == "list":
+        checkpoints = middleware.list_checkpoints(
+            status=args.status,
+            stage=args.stage,
+            team_id=args.team,
+            agent_name=args.agent,
+            limit=args.limit
+        )
+        if args.json:
+            print(json.dumps(checkpoints, indent=2, default=str))
+        else:
+            print(f"\nHuman-in-the-Loop Checkpoints ({len(checkpoints)}):\n")
+            if not checkpoints:
+                print("  - No checkpoints matching filter.\n")
+            for cp in checkpoints:
+                st = f"[{cp['status']}]"
+                print(f"- {st:<10} ID: {cp['checkpoint_id']} | Stage: {cp['stage']:<20} | Agent: @{cp['agent_name']}")
+                print(f"  Summary: {cp['summary']}")
+                if cp.get("user_feedback"):
+                    print(f"  Feedback: {cp['user_feedback']}")
+                print()
+
+    elif subcmd == "show":
+        cp = middleware.get_checkpoint(args.checkpoint_id)
+        if not cp:
+            print(f"[ERROR] Checkpoint '{args.checkpoint_id}' not found.", file=sys.stderr)
+            sys.exit(1)
+        if args.json:
+            print(json.dumps(cp, indent=2, default=str))
+        else:
+            print("\n" + middleware.render_checkpoint_prompt(args.checkpoint_id) + "\n")
+
+    elif subcmd == "approve":
+        try:
+            res = middleware.resolve_checkpoint(args.checkpoint_id, status="APPROVED", user_feedback=args.feedback)
+            if args.json:
+                print(json.dumps(res, indent=2, default=str))
+            else:
+                print(f"\n[APPROVED] Checkpoint [{args.checkpoint_id}] has been approved.")
+                if args.feedback:
+                    print(f"User Feedback: {args.feedback}")
+                print("Agents may now proceed past this gate.\n")
+        except Exception as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif subcmd == "reject":
+        try:
+            res = middleware.resolve_checkpoint(args.checkpoint_id, status="REJECTED", user_feedback=args.feedback)
+            if args.json:
+                print(json.dumps(res, indent=2, default=str))
+            else:
+                print(f"\n[REJECTED] Checkpoint [{args.checkpoint_id}] has been rejected / revision requested.")
+                if args.feedback:
+                    print(f"User Feedback: {args.feedback}")
+                print("Agents must rework deliverables or clarify assumptions.\n")
+        except Exception as e:
+            print(f"[ERROR] {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif subcmd == "request":
+        try:
+            payload = json.loads(args.context) if args.context else {}
+        except Exception:
+            payload = {"raw_context": args.context}
+
+        res = middleware.create_checkpoint(
+            system_type=args.system,
+            stage=args.stage,
+            agent_name=args.agent,
+            summary=args.summary,
+            context_payload=payload,
+            team_id=args.team,
+            checkpoint_id=args.id
+        )
+        if args.json:
+            print(json.dumps(res, indent=2, default=str))
+        else:
+            print(f"\nCreated HITL Checkpoint: [{res['checkpoint_id']}]")
+            print(f"- Stage:  {res['stage']}")
+            print(f"- System: {res['system_type']}")
+            print(f"- Agent:  @{res['agent_name']}")
+            print(f"- Status: PENDING (Awaiting human verification)\n")
+    else:
+        print("Usage: meet hitl [list|show|approve|reject|request]")
 
 
 def handle_run(args):
@@ -248,8 +495,12 @@ def handle_answer(args):
     if not WorkflowEngine:
         print("[ERROR] WorkflowEngine could not be loaded", file=sys.stderr)
         sys.exit(1)
+    
+    intent = TeamEngine.classify_prompt_intent(args.query)
     engine = WorkflowEngine()
     ans = engine.generate_answer(query=args.query, explicit_agent=args.agent)
+    ans["intent"] = intent
+
     if args.json:
         print(json.dumps(ans, indent=2))
     else:
@@ -292,7 +543,7 @@ def handle_doctor():
     try:
         mem_mgr = MemoryManager()
         stats = mem_mgr.get_stats()
-        print(f"- SQLite Memory DB: [OK] ({stats['size_kb']} KB, {stats['total_memories']} memories, {stats['total_events']} events)")
+        print(f"- SQLite Memory DB: [OK] ({stats['size_kb']} KB, {stats['total_memories']} memories, {stats['total_events']} events, {stats.get('total_teams', 0)} teams)")
     except Exception as e:
         print(f"- SQLite Memory DB: [FAIL] ({e})")
 
@@ -398,6 +649,101 @@ def main():
     mem_ev.add_argument("--limit", type=int, default=10, help="Maximum events to return (default: 10)")
     mem_ev.add_argument("--json", action="store_true", help="Output in JSON")
 
+    # Subcommand: team
+    team_parser = subparsers.add_parser("team", help="Collaborative Agent Team management, task claiming & peer communication")
+    team_sub = team_parser.add_subparsers(dest="team_command", help="Team action")
+
+    team_create = team_sub.add_parser("create", help="Create new collaborative agent team")
+    team_create.add_argument("--id", type=str, required=True, help="Unique team identifier (e.g. team-fullstack)")
+    team_create.add_argument("--name", type=str, required=True, help="Human-readable team name")
+    team_create.add_argument("--lead", type=str, required=True, help="Lead agent name (e.g. orchestrator, architect)")
+    team_create.add_argument("--objective", type=str, required=True, help="High-level team goal or mission")
+    team_create.add_argument("--members", type=str, default="", help="JSON list or comma-separated agent names")
+    team_create.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_list = team_sub.add_parser("list", help="List all registered collaborative teams in SQLite")
+    team_list.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_task = team_sub.add_parser("task-add", help="Add task to team shared board")
+    team_task.add_argument("--id", type=str, required=True, help="Team ID")
+    team_task.add_argument("--title", type=str, required=True, help="Task title")
+    team_task.add_argument("--desc", type=str, required=True, help="Detailed task requirements")
+    team_task.add_argument("--deps", type=str, default="", help="Comma-separated dependent task IDs")
+    team_task.add_argument("--task-id", type=str, default=None, help="Explicit task ID (e.g. task-001)")
+    team_task.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_tasks = team_sub.add_parser("tasks", help="List team tasks")
+    team_tasks.add_argument("--id", type=str, required=True, help="Team ID")
+    team_tasks.add_argument("--unblocked", action="store_true", help="Show only unblocked tasks ready to claim")
+    team_tasks.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_claim = team_sub.add_parser("claim", help="Claim an unblocked task for an agent")
+    team_claim.add_argument("--id", type=str, required=True, help="Team ID")
+    team_claim.add_argument("--task-id", type=str, required=True, help="Task ID to claim")
+    team_claim.add_argument("--agent", type=str, required=True, help="Claiming agent name")
+    team_claim.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_comp = team_sub.add_parser("complete", help="Complete a claimed task and unblock dependents")
+    team_comp.add_argument("--id", type=str, required=True, help="Team ID")
+    team_comp.add_argument("--task-id", type=str, required=True, help="Task ID to mark complete")
+    team_comp.add_argument("--agent", type=str, required=True, help="Completing agent name")
+    team_comp.add_argument("--outputs", type=str, default="", help="Comma-separated output artifacts / file paths")
+    team_comp.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_msg = team_sub.add_parser("msg", help="Send peer message between teammates")
+    team_msg.add_argument("--id", type=str, required=True, help="Team ID")
+    team_msg.add_argument("--from-agent", type=str, required=True, help="Sender agent name")
+    team_msg.add_argument("--to-agent", type=str, default="ALL", help="Target agent name or 'ALL'")
+    team_msg.add_argument("--content", type=str, required=True, help="Message body or review feedback")
+    team_msg.add_argument("--reply-to", type=int, default=None, help="Optional parent message ID")
+    team_msg.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_board = team_sub.add_parser("board", help="Display or synchronize team task board")
+    team_board.add_argument("--id", type=str, required=True, help="Team ID")
+    team_board.add_argument("--sync", action="store_true", default=True, help="Synchronize to .agent/context/TEAM_BOARD.md")
+    team_board.add_argument("--no-sync", dest="sync", action="store_false", help="Skip Markdown sync")
+    team_board.add_argument("--json", action="store_true", help="Output in JSON")
+
+    team_route = team_sub.add_parser("route", help="Classify prompt intent (Subagent vs Agent Team)")
+    team_route.add_argument("prompt", type=str, help="Prompt text to classify")
+    team_route.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: hitl
+    hitl_parser = subparsers.add_parser("hitl", help="Human-in-the-Loop (HITL) middleware checkpoints, alignment & sign-offs")
+    hitl_sub = hitl_parser.add_subparsers(dest="hitl_command", help="HITL action")
+
+    hitl_list = hitl_sub.add_parser("list", help="List checkpoints awaiting human verification")
+    hitl_list.add_argument("--status", choices=["PENDING", "APPROVED", "REJECTED", "CLARIFIED"], default=None, help="Filter by status")
+    hitl_list.add_argument("--stage", choices=["DOMAIN_KNOWLEDGE", "PLAN_APPROVAL", "VERIFICATION_SIGNOFF"], default=None, help="Filter by stage")
+    hitl_list.add_argument("--team", type=str, default=None, help="Filter by team ID")
+    hitl_list.add_argument("--agent", type=str, default=None, help="Filter by agent name")
+    hitl_list.add_argument("--limit", type=int, default=20, help="Max results (default: 20)")
+    hitl_list.add_argument("--json", action="store_true", help="Output in JSON")
+
+    hitl_show = hitl_sub.add_parser("show", help="Display structured checkpoint verification card")
+    hitl_show.add_argument("checkpoint_id", type=str, help="Checkpoint ID (e.g. hitl-domain-...)")
+    hitl_show.add_argument("--json", action="store_true", help="Output in JSON")
+
+    hitl_app = hitl_sub.add_parser("approve", help="Approve checkpoint and permit execution to proceed")
+    hitl_app.add_argument("checkpoint_id", type=str, help="Checkpoint ID to approve")
+    hitl_app.add_argument("--feedback", type=str, default="Approved", help="Optional human verification feedback")
+    hitl_app.add_argument("--json", action="store_true", help="Output in JSON")
+
+    hitl_rej = hitl_sub.add_parser("reject", help="Reject checkpoint or request changes")
+    hitl_rej.add_argument("checkpoint_id", type=str, help="Checkpoint ID to reject")
+    hitl_rej.add_argument("--feedback", type=str, required=True, help="Reason for rejection or requested changes")
+    hitl_rej.add_argument("--json", action="store_true", help="Output in JSON")
+
+    hitl_req = hitl_sub.add_parser("request", help="Create new HITL checkpoint")
+    hitl_req.add_argument("--system", choices=["subagent", "team"], default="subagent", help="System architecture")
+    hitl_req.add_argument("--stage", choices=["DOMAIN_KNOWLEDGE", "PLAN_APPROVAL", "VERIFICATION_SIGNOFF"], required=True, help="Checkpoint gate stage")
+    hitl_req.add_argument("--agent", type=str, required=True, help="Agent creating checkpoint")
+    hitl_req.add_argument("--summary", type=str, required=True, help="Summary of decision, plan, or evidence")
+    hitl_req.add_argument("--team", type=str, default=None, help="Optional Team ID")
+    hitl_req.add_argument("--context", type=str, default="{}", help="JSON context payload")
+    hitl_req.add_argument("--id", type=str, default=None, help="Optional explicit checkpoint ID")
+    hitl_req.add_argument("--json", action="store_true", help="Output in JSON")
+
     # Subcommand: doctor
     subparsers.add_parser("doctor", help="Run system diagnostics")
 
@@ -432,6 +778,10 @@ def main():
         handle_list(args)
     elif args.subcommand == "memory":
         handle_memory(args)
+    elif args.subcommand == "team":
+        handle_team(args)
+    elif args.subcommand == "hitl":
+        handle_hitl(args)
     elif args.subcommand == "doctor":
         handle_doctor()
     else:

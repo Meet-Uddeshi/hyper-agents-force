@@ -143,6 +143,13 @@ For multi-step tasks, state a brief plan:
 ```
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Human-in-the-Loop (HITL) Verification Protocol (MANDATORY FOR SUBAGENTS & TEAMS)
+
+Every agent and team must adhere to the 3-Gate HITL Middleware:
+1. **Gate 1 (Domain Knowledge Discovery)**: Discover and validate project domain knowledge and technical boundaries before coding. If requirements or architecture have multiple interpretations, pause and verify with the user.
+2. **Gate 2 (Pre-Mutation Plan Approval)**: For non-trivial modifications, present the planned file scope and implementation sequence for user approval before making changes.
+3. **Gate 3 (User Verification & Sign-Off)**: Demonstrate observable verification evidence (automated test runs, diffs) and receive explicit user confirmation before concluding any task or team delivery.
+
 ---
 description: Superpowers agentic framework. Mandatory disciplined software development methodology (brainstorming, TDD, systematic plan & execution, code review, verification).
 ---
@@ -177,7 +184,7 @@ Whenever a user prompt is received:
    - **Specialist Path (Complex Code, Architecture, Debugging, Multi-file without Solution)**: Select specialist agent(s) and skill(s), output the announcement header, and apply specialist rigor.
 3. **Mandatory Announcement Header (Specialist Path Only)**: Output the specialist declaration:
    `markdown
-   🤖 **Applying knowledge of @[agent-name]...**
+   **[AGENT ACTIVATION] Applying knowledge of @[agent-name]...**
    I am using the [Skill Name] skill to [specific action].
    `
 4. **Load Knowledge & Enforce Constraints**: For specialist path tasks, read the agent instructions from .agent/agents/{agent}.md (or global ~/.gemini/config/agents/{agent}.md) and skill instructions from .agent/skills/{skill}/SKILL.md (or global ~/.gemini/config/skills/{skill}/SKILL.md or global-rules/{skill}/SKILL.md).
@@ -220,22 +227,35 @@ The full, granular keyword mappings across all 10 engineering domains and 108 ag
 
 ---
 
-## 4. Multi-Domain & Multi-Agent Auto-Orchestration Rules
+## 4. Dual Execution Methodology: Subagents vs. Agent Teams
+
+Antigravity operates across two complementary execution modes:
+
+1. **Subagents System (Specialist Model)**:
+   - **Invocation**: Explicit `@agent-name` prefix or single-task autonomous prompt matching.
+   - **Characteristics**: Single specialist agent with isolated context boundary. Executes targeted feature, bug, or review and reports back directly.
+2. **Agent Teams System (Collaborative Team Model)**:
+   - **Invocation**: Explicit `$team-name` (or `#team-name`) prefix or collaborative project prompt matching (with team objectives, cross-functional roles, and work backlog).
+   - **Characteristics**: Collaborative peer-to-peer team with Team Lead, centralized shared task board (SQLite synced to `.agent/context/TEAM_BOARD.md`), atomic task claiming (`UNCLAIMED -> CLAIMED -> IN_PROGRESS -> DONE`), and direct teammate message bus (`meet team msg`).
+
+---
+
+## 5. Multi-Domain & Multi-Agent Auto-Orchestration Rules
 
 When a prompt contains triggers from **two or more distinct domains** or requires **multi-agent collaboration**:
-1. **Auto-Invoke Master Agent**: `orchestrator` + domain specialists (`multi-agent-orchestration`, `parallel-agents`, `context-management`, `memory-protocol`).
-2. **Blackboard Context Sharing**: Active agents coordinate through `.agent/context/BLACKBOARD.md` to share facts, invariants, and handoff artifacts without token dumps.
+1. **Auto-Invoke Master Agent / Team Lead**: `orchestrator` or `architect` + domain specialists (`multi-agent-orchestration`, `parallel-agents`, `context-management`, `memory-protocol`).
+2. **Shared Board & Blackboard Coordination**: Active agents coordinate through `.agent/context/TEAM_BOARD.md` and `.agent/context/BLACKBOARD.md` to share facts, DAG task statuses, and handoff artifacts without token dumps.
 3. **Dynamic Runtime Complexity Escalation**: When ANY agent detects ambiguity, multi-file impact, or test failures, it MUST immediately self-escalate to Superpowers (`brainstorming`, `systematic-debugging`, `test-driven-development`).
-4. **Context & Memory Engineering**: Subagents execute in isolated contexts returning concise summaries (< 300 words). Ephemeral errors are recorded in `SESSION_FAILURES.md`; permanent patterns in `.agent/memory/ARCHITECTURE_MEMORY.md`.
+4. **Context & Memory Engineering**: Teammates execute in bounded contexts returning concise summaries (< 300 words). Ephemeral errors are recorded in `SESSION_FAILURES.md`; permanent patterns in `.agent/memory/ARCHITECTURE_MEMORY.md`.
 5. **Enforce Verification Gate**: Before declaring done, run verification via `test_intelligent_routing.py` or `checklist.py`.
 
 ---
 
-## 5. Global & Multi-Project Portability Specification
+## 6. Global & Multi-Project Portability Specification
 
 To enable this system to operate seamlessly in any repository or global setting:
 1. **Relative & Fallback Path Resolution**:
    - Primary: Look in local workspace `.agent/agents/{agent}.md` and `.agent/skills/{skill}/SKILL.md`.
    - Global Fallback: Look in user's global config `~/.gemini/config/agents/{agent}.md` and `~/.gemini/config/skills/{skill}/SKILL.md` or `global-rules/{skill}/SKILL.md`.
-2. **Standardized Trigger Syntax**: Users can trigger agents either implicitly through natural prompt keywords OR explicitly with `@agent-name` or `/workflow` commands.
+2. **Standardized Trigger Syntax**: Users can trigger agents either implicitly through natural prompt keywords OR explicitly with `@agent-name` (Subagent), `$team-name` (Agent Team), or `/workflow` commands.
 3. **Zero Configuration**: Any project containing this rule setup automatically inherits full automatic agent selection and skill enforcement.

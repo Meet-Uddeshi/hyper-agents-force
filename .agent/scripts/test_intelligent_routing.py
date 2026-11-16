@@ -185,7 +185,13 @@ class IntelligentRouter:
     def route(cls, prompt: str):
         prompt_lower = prompt.lower()
         
-        # Check explicit override (@agent-name)
+        # Check explicit team override ($team-name or #team-name or $team:...)
+        m_team = re.search(r"[\$#]team[:\-_]?([a-zA-Z0-9_\-]*)", prompt, re.IGNORECASE)
+        if m_team:
+            team_label = m_team.group(1) or "team"
+            return f"team:{team_label}", ["team-coordination", "task-board"], "EXPLICIT_TEAM_OVERRIDE"
+
+        # Check explicit subagent override (@agent-name)
         m_explicit = re.search(r"@([a-zA-Z0-9_-]+)", prompt)
         if m_explicit:
             explicit_name = m_explicit.group(1)
@@ -415,6 +421,72 @@ def test_explicit_override():
         return False
 
 
+def test_team_explicit_override():
+    print(f"\n{BOLD}Test 6: Explicit $team-name Override Verification{RESET}")
+    prompt = "$team:fullstack Build SaaS platform with Next.js and Go"
+    target, skills, method = IntelligentRouter.route(prompt)
+    if target == "team:fullstack" and method == "EXPLICIT_TEAM_OVERRIDE":
+        log_pass("Explicit $team:fullstack successfully routes to Agent Team System.")
+        return True
+    else:
+        log_fail(f"Expected team:fullstack via EXPLICIT_TEAM_OVERRIDE, got {target} via {method}")
+        return False
+
+
+def test_dual_prompt_templates():
+    print(f"\n{BOLD}Test 7: Autonomous Prompt Template Classification{RESET}")
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "bin"))
+    try:
+        from team_engine import TeamEngine
+    except ImportError:
+        from bin.team_engine import TeamEngine
+
+    # Subagent single task template
+    single_task_prompt = """
+Task:
+Fix memory leak in bulk CSV parser.
+
+Context:
+- Tech Stack: Node.js, TypeScript
+
+Deliverables:
+1. Stream fix.
+
+Verification:
+- Run npm test
+    """
+    res1 = TeamEngine.classify_prompt_intent(single_task_prompt)
+    if res1["system"] != "subagent":
+        log_fail(f"Expected subagent for single task template, got {res1['system']}")
+        return False
+    log_pass("Single task template correctly classifies to Subagent System.")
+
+    # Agent team collaborative project template
+    team_task_prompt = """
+Team Objective:
+Deliver scalable multi-tenant SaaS application.
+
+Cross-Functional Roles:
+- Architect: Schema & boundaries
+- Backend: REST endpoints
+- Frontend: Dashboard UI
+
+Work Backlog:
+- [ ] task-001: DB schema
+- [ ] task-002: API endpoints
+- [ ] task-003: React UI
+
+Team Delivery Gate:
+- Pass all E2E integration tests
+    """
+    res2 = TeamEngine.classify_prompt_intent(team_task_prompt)
+    if res2["system"] != "team":
+        log_fail(f"Expected team for collaborative project template, got {res2['system']}")
+        return False
+    log_pass("Collaborative project template correctly classifies to Agent Team System.")
+    return True
+
+
 def main():
     print(f"\n{BOLD}{CYAN}================================================================={RESET}")
     print(f"{BOLD}{CYAN}   ANTIGRAVITY INTELLIGENT PROMPT-TRIGGER ENGINE TEST SUITE       {RESET}")
@@ -425,11 +497,13 @@ def main():
     t3 = test_rules_synchronization()
     t4 = test_prompt_trigger_simulation()
     t5 = test_explicit_override()
+    t6 = test_team_explicit_override()
+    t7 = test_dual_prompt_templates()
 
     print(f"\n{BOLD}SUMMARY:{RESET}")
-    all_tests = [t1, t2, t3, t4, t5]
+    all_tests = [t1, t2, t3, t4, t5, t6, t7]
     if all(all_tests):
-        print(f"{BOLD}{GREEN}ALL 5 TEST SUITES PASSED 100%! System is fully operational.{RESET}\n")
+        print(f"{BOLD}{GREEN}ALL 7 TEST SUITES PASSED 100%! System is fully operational.{RESET}\n")
         return 0
     else:
         print(f"{BOLD}{RED}SOME TESTS FAILED! Check logs above.{RESET}\n")

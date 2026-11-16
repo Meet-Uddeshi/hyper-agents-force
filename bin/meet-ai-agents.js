@@ -180,6 +180,20 @@ function main() {
     if (res.error) {
       console.error(`[ERROR] Failed to execute memory command via python: ${res.error.message}`);
     }
+  } else if (cmd === 'team') {
+    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
+    const cliPy = path.join(__dirname, 'cli.py');
+    const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });
+    if (res.error) {
+      console.error(`[ERROR] Failed to execute team command via python: ${res.error.message}`);
+    }
+  } else if (cmd === 'hitl') {
+    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
+    const cliPy = path.join(__dirname, 'cli.py');
+    const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });
+    if (res.error) {
+      console.error(`[ERROR] Failed to execute hitl command via python: ${res.error.message}`);
+    }
   } else if (cmd === 'doctor') {
     handleDoctor();
   } else {
@@ -194,6 +208,8 @@ function main() {
     console.log('  meet run <workflow>           # Execute workflow automation');
     console.log('  meet answer "<query>"         # Generate structured workflow answer');
     console.log('  meet memory [query|log|sync]  # SQLite persistent memory & context engineering');
+    console.log('  meet team board --id <team>   # Shared task board, claiming & peer messaging');
+    console.log('  meet hitl list                # Checkpoints awaiting human verification');
     console.log('  meet doctor                   # Run system diagnostics\n');
   }
 }

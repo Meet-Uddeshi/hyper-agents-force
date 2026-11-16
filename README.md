@@ -29,13 +29,22 @@
   - [3. Installation via NPM / NPX](#3-installation-via-npm--npx)
 - [CLI Reference](#cli-reference)
 - [MCP Configuration & Tool Connection](#mcp-configuration--tool-connection)
+- [Dual Execution Methodology: Subagents vs. Agent Teams](#dual-execution-methodology-subagents-vs-agent-teams)
+  - [1. Subagents System (Specialist Model)](#1-subagents-system-specialist-model)
+  - [2. Agent Teams System (Collaborative Team Structure)](#2-agent-teams-system-collaborative-team-structure)
+  - [Manual Calling Prefixes (@agent vs $team)](#manual-calling-prefixes-agent-vs-team)
+- [Human-in-the-Loop (HITL) Middleware](#human-in-the-loop-hitl-middleware)
+  - [The 3 Alignment & Verification Gates](#the-3-alignment--verification-gates)
+  - [Subagent HITL Lifecycle](#subagent-hitl-lifecycle)
+  - [Agent Team HITL Lifecycle](#agent-team-hitl-lifecycle)
 - [Prompt Templates & Examples](#prompt-templates--examples)
-  - [Standard Prompt Template](#standard-prompt-template)
-  - [Example 1: Complex System Architecture](#example-1-complex-system-architecture)
-  - [Example 2: Systematic Debugging & Root Cause Analysis](#example-2-systematic-debugging--root-cause-analysis)
-  - [Example 3: AI & Machine Learning Pipeline Engineering](#example-3-ai--machine-learning-pipeline-engineering)
-  - [Example 4: Multi-Agent Parallel Orchestration](#example-4-multi-agent-parallel-orchestration)
-- [Memory & Blackboard System](#memory--blackboard-system)
+  - [Subagent System Prompt Template](#subagent-system-prompt-template)
+  - [Example 1: Systematic Debugging (Subagent System)](#example-1-systematic-debugging--root-cause-analysis-subagent-system)
+  - [Example 2: Complex System Architecture (Subagent System)](#example-2-complex-system-architecture-subagent-system)
+  - [Agent Team System Prompt Template](#agent-team-system-prompt-template)
+  - [Example 3: Full-Stack Feature Team (Agent Team System)](#example-3-collaborative-full-stack-feature-team-agent-team-system)
+  - [Example 4: Mobile Platform & Security Team (Agent Team System)](#example-4-mobile-platform--security-audit-team-agent-team-system)
+- [Memory & Shared Board System](#memory--shared-board-system)
 - [Verification & Test Suite](#verification--test-suite)
 - [License](#license)
 
@@ -257,6 +266,23 @@ hyper-agents-force memory status        # Inspect SQLite FTS5 database stats
 hyper-agents-force memory query "query" # Search memory with full-text search
 hyper-agents-force memory blackboard   # View current active blackboard tasks
 
+# Collaborative Agent Team Management & Shared Board
+hyper-agents-force team create --id <id> --name <name> --lead <lead> --objective <goal>
+hyper-agents-force team board --id <id>     # Display live shared task board & sync to TEAM_BOARD.md
+hyper-agents-force team task-add --id <id>  # Add task with dependencies to shared DAG board
+hyper-agents-force team tasks --id <id>     # List unblocked tasks ready for claiming
+hyper-agents-force team claim --id <id>     # Atomically claim unblocked task for an agent
+hyper-agents-force team complete --id <id>  # Complete task & unblock downstream dependents
+hyper-agents-force team msg --id <id>       # Send direct peer-to-peer message between teammates
+hyper-agents-force team route "<prompt>"    # Autonomously classify prompt intent (Subagent vs Team)
+
+# Human-in-the-Loop (HITL) Verification Middleware
+hyper-agents-force hitl list                 # List pending checkpoints awaiting human verification
+hyper-agents-force hitl show <checkpoint_id> # Display structured verification prompt card
+hyper-agents-force hitl approve <id> --feedback "Confirmed" # Approve gate and permit execution
+hyper-agents-force hitl reject <id> --feedback "Changes..." # Request rework or clarify assumptions
+hyper-agents-force hitl request --system <subagent|team> --stage <DOMAIN_KNOWLEDGE|PLAN_APPROVAL|VERIFICATION_SIGNOFF> --agent <agent> --summary "<summary>"
+
 # Workflow Execution
 hyper-agents-force run audit            # Run security, CVE, lint, and test audit
 hyper-agents-force run plan-and-solve   # Run architecture planning & execution
@@ -329,15 +355,96 @@ Ready servers display `[READY]`, while unconfigured servers list their missing e
 
 ---
 
+## Dual Execution Methodology: Subagents vs. Agent Teams
+
+Hyper Agents Force provides two complementary execution models designed to handle both isolated specialist tasks and multi-faceted, collaborative engineering projects:
+
+### 1. Subagents System (Specialist Model)
+- **Architecture**: Single focused specialist agent executing in an isolated context boundary.
+- **Role & Function**: Solves targeted bugs, reviews code, implements individual components, or executes single-domain investigations. The agent reports findings and deliverables directly back to the parent session or user.
+- **Manual Calling Prefix**: `@agent-name` (e.g., `@fastapi-reviewer`, `@debugger`, `@frontend-specialist`, `@database-architect`).
+- **Autonomous Detection**: Automatically triggered when user prompts follow the single-task structure (isolated task objective, technical constraints, targeted deliverables, and verification command).
+
+### 2. Agent Teams System (Collaborative Team Structure)
+- **Architecture**: Decentralized collaborative team with distributed roles, shared context visibility, and peer-to-peer coordination.
+- **Role & Function**:
+  - **Team Lead**: Main Agent with leadership responsibility. Formulates the team objective, decomposes work into a Directed Acyclic Graph (DAG) of tasks, monitors execution, and verifies final delivery.
+  - **Centralized Shared Task Board**: Centralized task repository visible to all teammates (backed by SQLite `team_tasks` and synchronized in real time to [`.agent/context/TEAM_BOARD.md`](file:///d:/Personal/hyper-agents-force/.agent/context/TEAM_BOARD.md)). Tasks flow through atomic lifecycle states: `BLOCKED -> UNCLAIMED -> IN_PROGRESS -> DONE`.
+  - **Team Members**: Specialized individual workers equipped with distinct skills, agent rules, and domain focus. Teammates query the shared board for unblocked tasks, claim tasks atomically, and publish deliverables.
+  - **Teammate-to-Teammate Communication (P2P Message Bus)**: Direct peer message stream (`team_messages`) enabling teammates to exchange API specifications, review requests, and handoff notifications without routing through a central bottleneck.
+  - **Shared Context & Visibility**: All teammates operate against the live shared board and SQLite memory, ensuring full visibility with zero token duplication.
+- **Manual Calling Prefix**: `$team-name` or `#team-name` (e.g., `$team-fullstack`, `$team:auth-audit`, `#team-mobile`).
+- **Autonomous Detection**: Automatically triggered when user prompts follow the collaborative project structure (team objective, cross-functional roles, work backlog with task dependencies, and team delivery gates).
+
+### Manual Calling Prefixes (@agent vs $team)
+
+Developers can explicitly override automatic routing using standard prefixes:
+- **`@agent-name <prompt>`**: Immediately pins execution to that specific specialist agent (e.g., `@rust-reviewer verify thread safety in worker.rs`).
+- **`$team-name <prompt>`**: Immediately initializes a collaborative agent team with that team tag (e.g., `$team-ecommerce build checkout flow and Stripe webhook`).
+
+---
+
+## Human-in-the-Loop (HITL) Middleware
+
+Hyper Agents Force incorporates an explicit **Human-in-the-Loop (HITL) Middleware** ([`bin/hitl_middleware.py`](file:///d:/Personal/hyper-agents-force/bin/hitl_middleware.py)) operating across both Subagents and Agent Teams. This middleware prevents uncontrolled hallucinated writes, verifies domain alignment upfront, and requires user validation before changes are finalized.
+
+### The 3 Alignment & Verification Gates
+
+```
+Human-in-the-Loop 3-Gate Pipeline
+┌────────────────────────────────────────────────────────┐
+│ Gate 1: DOMAIN_KNOWLEDGE (Discovery & Alignment)       │
+│ - Validates existing architecture & domain entities    │
+│ - Intercepts ambiguity; prompts user for clarification │
+└──────────────────────────┬─────────────────────────────┘
+                           │ Approved
+┌──────────────────────────▼─────────────────────────────┐
+│ Gate 2: PLAN_APPROVAL (Pre-Mutation Review)            │
+│ - Evaluates proposed file scope & implementation steps │
+│ - User confirms non-breaking strategy                  │
+└──────────────────────────┬─────────────────────────────┘
+                           │ Approved
+┌──────────────────────────▼─────────────────────────────┐
+│ Gate 3: VERIFICATION_SIGNOFF (Post-Execution Evidence) │
+│ - Runs automated test suites & verifies observable logs│
+│ - User performs final sign-off before task close       │
+└────────────────────────────────────────────────────────┘
+```
+
+1. **Gate 1: DOMAIN_KNOWLEDGE (Pre-Execution Discovery & Alignment)**:
+   - **Purpose**: Prevents premature code generation based on shallow guesses or unverified assumptions.
+   - **Mechanism**: The agent scans project conventions, database schemas, and SQLite invariants. If any ambiguity or conflicting architectural patterns exist, the agent logs a `DOMAIN_KNOWLEDGE` checkpoint and asks the user strategic clarification questions. Work pauses until the user validates the domain context.
+2. **Gate 2: PLAN_APPROVAL (Pre-Modification Plan Approval)**:
+   - **Purpose**: Gives users complete oversight before files are modified on disk.
+   - **Mechanism**: For any non-trivial change (affecting > 2 files or modifying core services), the agent or Team Lead generates an implementation plan with targeted file paths. Work proceeds only when the user approves (`hyper-agents-force hitl approve <id>`).
+3. **Gate 3: VERIFICATION_SIGNOFF (Post-Execution User Verification)**:
+   - **Purpose**: Guarantees observable, verified evidence before a subagent finishes or a team signs off on deliverables.
+   - **Mechanism**: The completing agent runs automated tests, compiles diffs, and registers a `VERIFICATION_SIGNOFF` checkpoint. The mission is officially closed only when the human user confirms the test results and delivery.
+
+### Subagent HITL Lifecycle
+- Single specialist checks domain invariants -> presents plan -> requests user approval -> implements fix -> runs tests -> presents evidence to user for sign-off.
+
+### Agent Team HITL Lifecycle
+- Team Lead runs Gate 1 (Domain Knowledge) with user to align on team objectives and domain models.
+- Work backlog DAG is published to the shared board ([`.agent/context/TEAM_BOARD.md`](file:///d:/Personal/hyper-agents-force/.agent/context/TEAM_BOARD.md)).
+- Teammates autonomously claim and implement unblocked tasks.
+- Team Lead runs Gate 3 (Verification Sign-Off) presenting full integration test results for user approval.
+
+---
+
 ## Prompt Templates & Examples
 
-### Standard Prompt Template
+You do **not** need to manually look up agent names or skills. Hyper Agents Force inspects prompt structure and intent to autonomously determine whether to dispatch a **Subagent** or assemble an **Agent Team**, selecting the optimal lead, specialists, and skills automatically.
 
-Use this structured prompt format when interacting with Antigravity, Gemini CLI, or Claude Code. You do **not** need to manually specify agent names or skills—the runtime's Intelligent Routing Engine autonomously resolves the optimal specialist agent and injects the required skills based on your task and context:
+---
+
+### Subagent System Prompt Template
+
+Use this format for single-domain tasks, bug fixes, component refactoring, or code reviews:
 
 ```markdown
 Task:
-{Clear 1-2 sentence description of what needs to be accomplished}
+{Clear 1-2 sentence description of single focused task or bug}
 
 Context:
 - Project Tech Stack: {e.g., Next.js 15, PostgreSQL, Prisma, TypeScript}
@@ -356,37 +463,7 @@ Verification:
 
 ---
 
-### Example 1: Complex System Architecture
-
-#### User Prompt:
-```markdown
-Task:
-Refactor our monolithic order processing service into a decoupled Hexagonal (Ports & Adapters) architecture.
-
-Context:
-- Project Tech Stack: Node.js, TypeScript, PostgreSQL, Stripe SDK
-- Constraints: Zero breaking changes to public API, isolate domain logic from infrastructure adapters
-- Relevant Files: src/services/OrderService.ts
-
-Deliverables:
-1. Domain entity models and repository interfaces (Ports).
-2. Infrastructure adapters for Postgres and Stripe.
-3. Architecture Decision Record (ADR-004) documenting the boundary choices.
-
-Verification:
-- Run npm run build
-- Run npm test
-- Verify no infrastructure dependencies are imported inside the domain core.
-```
-
-#### Autonomous Execution Result:
-* **Autonomous Agent**: `code-architect`
-* **Auto-Injected Skills**: `clean-code`, `architecture`, `architecture-decision-records`, `hexagonal-architecture`
-* **Autonomous Actions**: Scans structural call hierarchy, isolates ports and adapters, writes domain entities with zero external dependencies, generates ADR-004, and validates build and test pipelines.
-
----
-
-### Example 2: Systematic Debugging & Root Cause Analysis
+### Example 1: Systematic Debugging & Root Cause Analysis (Subagent System)
 
 #### User Prompt:
 ```markdown
@@ -409,80 +486,164 @@ Verification:
 ```
 
 #### Autonomous Execution Result:
+* **Execution System**: Subagent System (Specialist Agent Invocation)
 * **Autonomous Agent**: `debugger`
 * **Auto-Injected Skills**: `systematic-debugging`, `root-cause-tracing`, `clean-code`
 * **Autonomous Actions**: Executes 4-phase debugging protocol: isolates leak without modifying production code, writes deterministic reproduction test, refactors to backpressure-aware Node stream pipeline, and confirms memory stabilization.
 
 ---
 
-### Example 3: AI & Machine Learning Pipeline Engineering
+### Example 2: Complex System Architecture (Subagent System)
 
 #### User Prompt:
 ```markdown
 Task:
-Build an agentic research assistant pipeline in LangGraph with persistent SQLite checkpointing and semantic vector retrieval.
+Refactor our monolithic order processing service into a decoupled Hexagonal (Ports & Adapters) architecture.
 
 Context:
-- Project Tech Stack: Python 3.11, LangGraph, ChromaDB, Gemini 2.0 Flash
-- Constraints: Bounded context window, structured JSON output, citation verification
-- Relevant Files: src/agents/researcher.py, src/pipeline/graph.py
+- Project Tech Stack: Node.js, TypeScript, PostgreSQL, Stripe SDK
+- Constraints: Zero breaking changes to public API, isolate domain logic from infrastructure adapters
+- Relevant Files: src/services/OrderService.ts
 
 Deliverables:
-1. StateGraph implementation with researcher and reviewer agent nodes.
-2. SQLite checkpoint saver for interrupt-and-resume execution.
-3. Evaluation benchmark verifying retrieval faithfulness and answer relevance.
+1. Domain entity models and repository interfaces (Ports).
+2. Infrastructure adapters for Postgres and Stripe.
+3. Architecture Decision Record (ADR-004) documenting boundary choices.
 
 Verification:
-- Run pytest tests/test_agent_pipeline.py
-- Verify latency and token consumption metrics remain within budget.
-```
-
-#### Autonomous Execution Result:
-* **Autonomous Agent**: `ai-engineer`
-* **Auto-Injected Skills**: `agentic-frameworks`, `context-engineering`, `production-rag`, `inference-engineering`
-* **Autonomous Actions**: Compiles StateGraph with cyclical review loop, configures SQLite checkpointing saver, implements token-bounded RAG retrieval, and executes evaluation benchmark.
-
----
-
-### Example 4: Multi-Agent Parallel Orchestration
-
-#### User Prompt:
-```markdown
-Task:
-Coordinate a parallel full-stack feature release: create the database migration, implement the REST API endpoints, and build the responsive dark-mode React dashboard component simultaneously.
-
-Context:
-- Project Tech Stack: PostgreSQL, Prisma, Express/TypeScript, React 19, Tailwind CSS
-- Constraints: Independent parallel execution across modules with verified integration
-- Relevant Files: prisma/schema.prisma, src/api/routes.ts, src/components/Dashboard.tsx
-
-Deliverables:
-1. Database schema migration with optimized foreign key indexes.
-2. REST API endpoints with request validation middleware.
-3. Responsive dashboard UI component adhering to design standards.
-4. End-to-end integration test validating full contract.
-
-Verification:
-- Run npx prisma validate
 - Run npm run build
-- Run npm test tests/e2e/feature.test.ts
+- Run npm test
+- Verify no infrastructure dependencies are imported inside the domain core.
 ```
 
 #### Autonomous Execution Result:
-* **Autonomous Agent**: `orchestrator`
-* **Auto-Injected Skills**: `parallel-agents`, `multi-agent-orchestration`, `task-coordination`
-* **Autonomous Actions**: Dispatches parallel subagents (`database-architect` for schema, `backend-specialist` for API, `frontend-specialist` for UI), orchestrates dependency ordering, writes real-time event telemetry to `.agent/context/BLACKBOARD.md`, and runs integration verification.
+* **Execution System**: Subagent System (Specialist Agent Invocation)
+* **Autonomous Agent**: `code-architect`
+* **Auto-Injected Skills**: `clean-code`, `architecture`, `architecture-decision-records`, `hexagonal-architecture`
+* **Autonomous Actions**: Scans structural call hierarchy, isolates ports and adapters, writes domain entities with zero external dependencies, generates ADR-004, and validates build and test pipelines.
 
 ---
 
-## Memory & Blackboard System
+### Agent Team System Prompt Template
 
-Hyper Agents Force features a **dual-tier persistent memory architecture**:
+Use this format for multi-domain features, full-stack applications, security audits, or projects requiring cross-functional agent collaboration:
+
+```markdown
+Task:
+Team Objective: {High-level project mission requiring collaborative multi-agent execution}
+
+Context:
+- Project Tech Stack: {e.g., PostgreSQL, Express, TypeScript, React 19, Tailwind CSS}
+- Cross-Functional Roles: {e.g., Architect (Lead), Database Architect, Backend Specialist, Frontend Specialist, Test Engineer}
+- Team Coordination: Shared Task Board (.agent/context/TEAM_BOARD.md) & Teammate-to-Teammate P2P Messaging
+
+Deliverables:
+Work Backlog:
+1. [ ] task-001: {e.g., Database Schema & Migrations}
+2. [ ] task-002: {e.g., REST API Endpoints} (Depends on: task-001)
+3. [ ] task-003: {e.g., React Dashboard UI Component} (Depends on: task-002)
+4. [ ] task-004: {e.g., Security Audit & E2E Integration Suite} (Depends on: task-002, task-003)
+
+Verification:
+Team Delivery Gate:
+- Run {command, e.g., npm run test:e2e && npm run audit}
+- Confirm Team Lead verification sign-off and all tasks marked DONE on shared task board.
+```
+
+---
+
+### Example 3: Collaborative Full-Stack Feature Team (Agent Team System)
+
+#### User Prompt:
+```markdown
+Task:
+Team Objective: Build a real-time analytics dashboard with PostgreSQL persistence, REST API endpoints, and a responsive Tailwind CSS interface.
+
+Context:
+- Project Tech Stack: PostgreSQL, Prisma, Express, TypeScript, React 19, Tailwind CSS
+- Cross-Functional Roles: Architect (Lead), Database Architect, Backend Specialist, Frontend Specialist, Test Engineer
+- Team Coordination: Shared Task Board (.agent/context/TEAM_BOARD.md) & Teammate-to-Teammate P2P Messaging
+
+Deliverables:
+Work Backlog:
+1. [ ] task-001: Schema design for analytics events and daily aggregations.
+2. [ ] task-002: Express REST API endpoints with request validation middleware. (Depends on: task-001)
+3. [ ] task-003: Responsive analytics dashboard component with charts. (Depends on: task-002)
+4. [ ] task-004: End-to-end integration test suite verifying end-to-end contract. (Depends on: task-002, task-003)
+
+Verification:
+Team Delivery Gate:
+- Run npm run test:e2e
+- Verify Team Lead sign-off, all tasks DONE on board, and zero regressions.
+```
+
+#### Autonomous Execution Result:
+* **Execution System**: Agent Team System (Collaborative Team Structure)
+* **Autonomous Team Lead**: `architect`
+* **Autonomous Team Roster**: `database-architect`, `backend-specialist`, `frontend-specialist`, `test-engineer`
+* **Auto-Injected Skills**: `team-coordination`, `clean-code`, `database-design`, `react-best-practices`, `testing-patterns`
+* **Autonomous Actions**:
+  1. Team Lead `architect` initializes team `team-analytics`, defines task DAG with dependencies, and synchronizes `.agent/context/TEAM_BOARD.md`.
+  2. Teammate `database-architect` detects unblocked `task-001`, claims it atomically, outputs `prisma/schema.prisma`, and completes the task.
+  3. `task-002` automatically transitions from `BLOCKED` to `UNCLAIMED`. Teammate `backend-specialist` claims `task-002`, implements API routes, and delivers direct peer message to `frontend-specialist` with endpoint contracts.
+  4. `task-003` unlocks. Teammate `frontend-specialist` claims `task-003` and implements the dashboard components using verified API contracts.
+  5. `task-004` unlocks. Teammate `test-engineer` claims `task-004`, executes Playwright integration suite, verifies assertions, and marks task complete.
+  6. Team Lead `architect` reviews all artifacts, confirms zero regressions, and delivers final sign-off.
+
+---
+
+### Example 4: Mobile Platform & Security Audit Team (Agent Team System)
+
+#### User Prompt:
+```markdown
+Task:
+Team Objective: Implement biometric authentication and secure token storage for iOS and Android with automated security penetration audit.
+
+Context:
+- Project Tech Stack: React Native, Expo, TypeScript, SecureStore, Biometrics API
+- Cross-Functional Roles: Mobile Developer (Lead), Security Specialist, Mobile Automation Engineer
+- Team Coordination: Shared Task Board (.agent/context/TEAM_BOARD.md) & Teammate-to-Teammate P2P Messaging
+
+Deliverables:
+Work Backlog:
+1. [ ] task-001: Biometric auth service wrapper with FaceID and TouchID fallback handling.
+2. [ ] task-002: Keychain secure token storage adapter. (Depends on: task-001)
+3. [ ] task-003: Mobile penetration audit against OWASP Mobile Top 10 vulnerabilities. (Depends on: task-002)
+4. [ ] task-004: Appium cross-platform automation test suite for authentication flows. (Depends on: task-001, task-002)
+
+Verification:
+Team Delivery Gate:
+- Run npm run test:mobile && npm run audit:security
+- Confirm zero critical vulnerabilities and verified test passing across simulators.
+```
+
+#### Autonomous Execution Result:
+* **Execution System**: Agent Team System (Collaborative Team Structure)
+* **Autonomous Team Lead**: `mobile-developer`
+* **Autonomous Team Roster**: `mobile-developer`, `security-specialist`, `mobile-automation-engineer`
+* **Auto-Injected Skills**: `team-coordination`, `mobile-design`, `security-scan`, `mobile-automation`, `clean-code`
+* **Autonomous Actions**:
+  1. Team Lead `mobile-developer` scaffolds team `team-mobile-auth`, publishes work DAG to shared board, and commits to SQLite.
+  2. Teammate `mobile-developer` claims unblocked `task-001`, implements biometric hooks, and marks complete.
+  3. Teammate `mobile-developer` claims unblocked `task-002`, implements Keychain storage adapter, and marks complete.
+  4. Downstream tasks `task-003` and `task-004` unlock concurrently.
+  5. Teammate `security-specialist` claims `task-003`, audits secure storage against token leakage, and sends direct peer message to `mobile-developer`.
+  6. Teammate `mobile-automation-engineer` claims `task-004`, executes Appium test suite, and confirms all gestures and bio-prompts pass.
+  7. Team Lead `mobile-developer` verifies full compliance and provides delivery sign-off.
+
+---
+
+## Memory & Shared Board System
+
+Hyper Agents Force features a **unified SQLite + Markdown cognitive architecture**:
 
 1. **Structured SQLite Database (`.agent/memory/memory.db`)**:
-   - `architecture_memory`: Durable records of architectural patterns, decisions, and system invariants.
-   - `session_failures`: High-fidelity records of bugs, stack traces, and verified solutions.
-   - `blackboard_events`: Inter-agent message journal tracking active workflows and task ownership.
+   - `memories`: Durable records of architectural patterns, system invariants, decisions, and failure solutions.
+   - `blackboard_events`: Inter-agent event journal tracking active workflows and task ownership.
+   - `agent_teams`: Active collaborative teams, team identifiers, leads, and objectives.
+   - `team_members`: Team roster, member specialist roles, and assigned skill configurations.
+   - `team_tasks`: Centralized claim-based DAG task board tracking states (`BLOCKED`, `UNCLAIMED`, `IN_PROGRESS`, `DONE`), dependencies, and artifacts.
+   - `team_messages`: Peer-to-peer inter-agent communication stream for review requests and direct handoffs.
    - **FTS5 Virtual Table**: Provides sub-millisecond full-text semantic keyword search.
    - **Bounded Query Execution**: All agent queries enforce `LIMIT 5` to safeguard context limits.
 
@@ -491,6 +652,7 @@ Hyper Agents Force features a **dual-tier persistent memory architecture**:
      - [`.agent/memory/ARCHITECTURE_MEMORY.md`](file:///d:/Personal/hyper-agents-force/.agent/memory/ARCHITECTURE_MEMORY.md)
      - [`.agent/memory/SESSION_FAILURES.md`](file:///d:/Personal/hyper-agents-force/.agent/memory/SESSION_FAILURES.md)
      - [`.agent/context/BLACKBOARD.md`](file:///d:/Personal/hyper-agents-force/.agent/context/BLACKBOARD.md)
+     - [`.agent/context/TEAM_BOARD.md`](file:///d:/Personal/hyper-agents-force/.agent/context/TEAM_BOARD.md)
 
 ---
 
@@ -511,6 +673,6 @@ python .agent/scripts/analyze_catalog.py
 
 Expected result:
 ```
-======================= 16 passed in 5.90s =======================
+======================= 18 passed in 21.12s =======================
 TEST RUN COMPLETED: Passed: 110 / 110 (100.0%)
 ```

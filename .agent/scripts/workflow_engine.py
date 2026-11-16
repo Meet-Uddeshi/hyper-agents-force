@@ -49,6 +49,7 @@ WORKFLOW_AGENT_ROUTING = {
     "enhance": ["code-simplifier", "refactor-cleaner", "performance-optimizer"],
     "preview": ["auto_preview", "frontend-specialist"],
     "status": ["coordinator", "chief-of-staff"],
+    "team": ["architect", "orchestrator", "project-planner", "coordinator"],
     "ui-ux-pro-max": ["frontend-specialist", "unslop", "a11y-architect"],
 }
 
@@ -249,6 +250,8 @@ class WorkflowEngine:
             matched_wf_name = "plan"
         elif re.search(r"deploy|docker|k8s|kubernetes|ci/cd|terraform", query_lower):
             matched_wf_name = "deploy"
+        elif re.search(r"\b(team|collaborative\s*team|agent\s*team|task\s*board|p2p|teammate)\b", query_lower) or query.startswith("$team") or query.startswith("#team"):
+            matched_wf_name = "team"
 
         wf = self.get_workflow(matched_wf_name) or self.get_workflow("orchestrate")
 
@@ -279,10 +282,16 @@ def format_answer_markdown(answer: Dict[str, Any]) -> str:
         f"- **Assigned Agent**: `{answer['selected_agent']}`",
         f"- **Triggered Workflow**: `/{answer['selected_workflow']}`",
         f"- **Workflow Objective**: {answer['workflow_description']}",
+    ]
+    intent = answer.get("intent")
+    if intent:
+        sys_label = "Agent Team System (Collaborative P2P & Shared Task Board)" if intent.get("system") == "team" else "Subagent System (Specialist Agent Invocation)"
+        lines.append(f"- **Execution System**: {sys_label} [{intent.get('mode')}]")
+    lines.extend([
         "",
         "#### Recommended Sub-commands",
         "```text",
-    ]
+    ])
     for sub in answer.get("recommended_subcommands", []):
         lines.append(sub)
     lines.extend([

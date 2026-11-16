@@ -70,13 +70,29 @@ Every agent operates within a dual-tier cognitive memory model:
 
 ---
 
-## 5. PROMPT-TRIGGER MULTI-AGENT ORCHESTRATION MODES
+## 5. DUAL EXECUTION METHODOLOGY: SUBAGENTS VS. AGENT TEAMS
 
-Based on user prompt intent, Antigravity selects the execution topology:
+Hyper Agents Force provides two complementary execution paradigms, accessible either manually via explicit syntax or autonomously through prompt template detection:
 
-- **Single Specialist Mode:** Single-domain prompts -> Direct specialist activation (e.g. `fastapi-reviewer` or `unslop`).
-- **Dynamic Escalation Mode:** Starts with a single specialist; if runtime complexity is encountered, self-escalates to Superpower skills.
-- **Multi-Agent Swarm Mode:** Complex multi-domain prompts (e.g. "Build SaaS with React frontend, Go backend, and Postgres") -> `orchestrator` coordinates `frontend-specialist`, `go-reviewer`, `database-architect`, and `test-engineer` via the shared blackboard.
+### 5.1 Subagents System (Specialist Invocation)
+- **Paradigm:** Single focused specialist agent executing an isolated task.
+- **Manual Invocation Prefix:** `@agent-name` (e.g., `@fastapi-reviewer`, `@debugger`, `@frontend-specialist`).
+- **Autonomous Detection:** Triggered when the prompt represents a single focused task, bug fix, component implementation, or domain review.
+- **Execution Lifecycle:**
+  1. Primary agent dispatches subagent with isolated context.
+  2. Subagent executes using required domain skills.
+  3. Subagent returns concise findings (< 300 words) or artifact paths.
+
+### 5.2 Agent Teams System (Collaborative Team Structure)
+- **Paradigm:** Decentralized collaborative team with distributed roles, shared visibility, and peer-to-peer coordination.
+- **Manual Invocation Prefix:** `$team-name` or `#team-name` (e.g., `$team-fullstack`, `$team:auth-audit`, `#team-mobile`).
+- **Autonomous Detection:** Triggered when the prompt defines a multi-role project, team objective, cross-functional dependencies, and work backlog.
+- **Core Roles & Functions:**
+  1. **Team Lead:** Main Agent with leadership responsibility. Formulates the team objective, decomposes work into a Directed Acyclic Graph (DAG) of tasks, monitors progress, and verifies final delivery.
+  2. **Centralized Shared Task Board:** Centralized task repository visible to all teammates (SQLite table `team_tasks`, synchronized in real time to `.agent/context/TEAM_BOARD.md`). Tasks flow through atomic states: `BLOCKED -> UNCLAIMED -> IN_PROGRESS -> DONE`.
+  3. **Team Members:** Specialized individual workers equipped with distinct skills, agent rules, and domain focus. Teammates query the shared board for unblocked tasks, claim tasks atomically, and publish deliverables.
+  4. **Teammate-to-Teammate Communication:** Direct peer message stream (`team_messages`) enabling teammates to exchange API specifications, review requests, and handoff notifications without routing through a central bottleneck.
+  5. **Shared Context & Visibility:** All teammates operate against the live shared board and SQLite memory, ensuring full visibility with zero token duplication.
 
 ---
 
@@ -146,6 +162,32 @@ When providing answers to complex user requests, agents must follow the structur
 3. **Multi-Agent Coordination & Blackboard Integration:**
    - If an agent is blocked awaiting user clarification during multi-agent orchestration, it must update `.agent/context/BLACKBOARD.md` marking the work item as `BLOCKED (Awaiting User Clarification)`.
    - Peer agents must not overwrite or assume the blocked agent's scope.
+
+---
+
+## 8. HUMAN-IN-THE-LOOP (HITL) MIDDLEWARE: 3-GATE PROTOCOL FOR SUBAGENTS & AGENT TEAMS
+
+To ensure precise alignment with project domain requirements and eliminate silent regressions, all agents across both Subagent and Agent Team architectures operate under the 3-Gate Human-in-the-Loop Middleware (`bin/hitl_middleware.py`):
+
+### 8.1 Gate 1: Domain Knowledge Discovery & Alignment (Pre-Execution)
+- **Invariant:** Before modifying any files or scaffoldings, the agent must acquire and validate correct domain knowledge:
+  1. Scan existing architectural patterns, database schemas, and business entity models.
+  2. Consult `.agent/memory/ARCHITECTURE_MEMORY.md` and SQLite invariants for established domain rules.
+  3. If domain requirements, business boundaries, or architectural decisions are ambiguous, the agent must create a `DOMAIN_KNOWLEDGE` checkpoint (`meet hitl request --stage DOMAIN_KNOWLEDGE`) and ask the user targeted clarification questions.
+  4. Work is suspended until the user confirms the domain model assumptions.
+
+### 8.2 Gate 2: Pre-Mutation Plan Approval (Pre-Modification)
+- **Invariant:** Before applying edits to production modules (or when a change affects > 2 files):
+  1. The subagent or Team Lead must produce a bite-sized, phased implementation plan detailing targeted files, non-breaking strategies, and risk mitigation.
+  2. Register the plan checkpoint (`meet hitl request --stage PLAN_APPROVAL`).
+  3. Require user confirmation (`meet hitl approve <checkpoint_id>`) before mutating code.
+
+### 8.3 Gate 3: Verification & User Sign-Off (Post-Execution)
+- **Invariant:** No task, subagent handoff, or team mission may be declared complete without human verification:
+  1. The completing agent must execute automated verification suites (`pytest`, `npm test`, or domain test runners).
+  2. Compile observable evidence: passing test counts, lint results, and exact file diffs.
+  3. Register the verification sign-off checkpoint (`meet hitl request --stage VERIFICATION_SIGNOFF`).
+  4. The Team Lead or Subagent delivers the sign-off card to the user. Final completion is certified only upon user approval.
 
 
 

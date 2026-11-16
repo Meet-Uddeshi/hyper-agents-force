@@ -68,6 +68,10 @@ def test_db_initialization(temp_db):
     assert "blackboard_events" in tables
     assert "fts_memories" in tables
     assert "schema_migrations" in tables
+    assert "agent_teams" in tables
+    assert "team_members" in tables
+    assert "team_tasks" in tables
+    assert "team_messages" in tables
     conn.close()
 
 

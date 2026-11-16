@@ -75,6 +75,81 @@ class MemoryManager:
             """)
 
             # Blackboard and agent coordination events
+
+            # Collaborative Agent Teams
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS agent_teams (
+                team_id TEXT PRIMARY KEY,
+                team_name TEXT NOT NULL,
+                lead_agent TEXT NOT NULL,
+                objective TEXT NOT NULL,
+                status TEXT DEFAULT 'ACTIVE',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Team Roster
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS team_members (
+                team_id TEXT NOT NULL,
+                agent_name TEXT NOT NULL,
+                role_description TEXT NOT NULL,
+                skills_json TEXT DEFAULT '[]',
+                PRIMARY KEY (team_id, agent_name)
+            );
+            """)
+
+            # Shared Task Board
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS team_tasks (
+                task_id TEXT PRIMARY KEY,
+                team_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                depends_on TEXT DEFAULT '[]',
+                claimed_by TEXT,
+                status TEXT DEFAULT 'BLOCKED',
+                input_artifacts TEXT DEFAULT '[]',
+                output_artifacts TEXT DEFAULT '[]',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Teammate-to-Teammate Message Bus
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS team_messages (
+                message_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT NOT NULL,
+                from_agent TEXT NOT NULL,
+                to_agent TEXT NOT NULL,
+                reply_to INTEGER,
+                content TEXT NOT NULL,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """)
+
+            # Human-in-the-Loop (HITL) Checkpoints & Verification Ledger
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS hitl_checkpoints (
+                checkpoint_id TEXT PRIMARY KEY,
+                system_type TEXT NOT NULL,
+                team_id TEXT,
+                agent_name TEXT NOT NULL,
+                stage TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                context_payload TEXT DEFAULT '{}',
+                status TEXT DEFAULT 'PENDING',
+                user_feedback TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TIMESTAMP
+            );
+            """)
+
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hitl_status ON hitl_checkpoints(status);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hitl_stage ON hitl_checkpoints(stage);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_hitl_team ON hitl_checkpoints(team_id);")
+
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS blackboard_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -405,6 +480,21 @@ class MemoryManager:
             cursor.execute("SELECT count(*) FROM blackboard_events;")
             total_events = cursor.fetchone()[0]
 
+            cursor.execute("SELECT count(*) FROM agent_teams;")
+            total_teams = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM team_tasks;")
+            total_team_tasks = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM team_messages;")
+            total_team_messages = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM hitl_checkpoints;")
+            total_hitl = cursor.fetchone()[0]
+
+            cursor.execute("SELECT count(*) FROM hitl_checkpoints WHERE status = 'PENDING';")
+            pending_hitl = cursor.fetchone()[0]
+
             cursor.execute("SELECT category, count(*) FROM memories GROUP BY category;")
             categories = {row[0]: row[1] for row in cursor.fetchall()}
 
@@ -416,6 +506,11 @@ class MemoryManager:
             "size_kb": round(size_bytes / 1024, 2),
             "total_memories": total_memories,
             "total_events": total_events,
+            "total_teams": total_teams,
+            "total_team_tasks": total_team_tasks,
+            "total_team_messages": total_team_messages,
+            "total_hitl": total_hitl,
+            "pending_hitl": pending_hitl,
             "categories": categories,
         }
 
