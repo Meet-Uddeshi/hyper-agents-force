@@ -45,12 +45,32 @@ try:
     from bin.memory_manager import MemoryManager
     from bin.team_engine import TeamEngine
     from bin.hitl_middleware import HitlMiddleware
+    from bin.security_guardrails import SecurityGuardrails
+    from bin.log4j_scanner import Log4jScanner
+    from bin.tech_stack_advisor import TechStackAdvisor
+    from bin.code_graph import CodeGraphEngine
+    from bin.codeflow_visualizer import CodeflowVisualizer
+    from bin.ask_engine import AskEngine
+    from bin.eval_harness import AutoEvalHarness
+    from bin.worktree_manager import WorktreeManager
+    from bin.dashboard import DashboardEngine
+    from bin.ci_bot import CIBot
 except ImportError:
     from installer import Installer
     from mcp_manager import McpManager
     from memory_manager import MemoryManager
     from team_engine import TeamEngine
     from hitl_middleware import HitlMiddleware
+    from security_guardrails import SecurityGuardrails
+    from log4j_scanner import Log4jScanner
+    from tech_stack_advisor import TechStackAdvisor
+    from code_graph import CodeGraphEngine
+    from codeflow_visualizer import CodeflowVisualizer
+    from ask_engine import AskEngine
+    from eval_harness import AutoEvalHarness
+    from worktree_manager import WorktreeManager
+    from dashboard import DashboardEngine
+    from ci_bot import CIBot
 
 # Import workflow engine if available
 try:
@@ -553,6 +573,191 @@ def handle_list(args):
         print()
 
 
+def handle_secure(args):
+    subcmd = args.secure_command
+    if subcmd == "audit":
+        res = SecurityGuardrails.audit_workspace()
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"\nAI Security & Guardrails Audit: {res['root']}")
+            print(f"- Risk Level: [{res['risk_level']}]")
+            print(f"- Shielded files detected: {len(res['shielded_files_found'])}")
+            for f in res["shielded_files_found"]:
+                print(f"  * {f}")
+            print(f"- Hardcoded secrets in code: {len(res['secrets_in_code'])}")
+            for item in res["secrets_in_code"]:
+                print(f"  * {item['file']}: {item['leaks_count']} leak(s) ({', '.join(item['types'])})")
+            print()
+    elif subcmd == "log4j":
+        if args.fix:
+            res = Log4jScanner.fix_workspace()
+            print(f"\nLog4j Automated Resolver:")
+            print(f"- Patched Files: {len(res['patched_files'])}")
+            for f in res["patched_files"]:
+                print(f"  * {f} -> updated to safe version {res['safe_version']}")
+            print()
+        else:
+            res = Log4jScanner.scan_workspace()
+            print(f"\nLog4j Vulnerability Audit: {res['root']}")
+            print(f"- Risk Level: [{res['risk_level']}]")
+            print(f"- Vulnerabilities Found: {res['vulnerabilities_found']}")
+            for f in res["findings"]:
+                print(f"  * {f['file']}: {f['dependency']} (Installed: {f['installed_version']})")
+                for cve in f["cves"]:
+                    print(f"    - {cve}")
+            print()
+    elif subcmd == "check-prompt":
+        chk = SecurityGuardrails.check_prompt_injection(args.prompt)
+        if args.json:
+            print(json.dumps(chk, indent=2))
+        else:
+            print(f"\nPrompt Safety Check: {'[SAFE]' if chk['is_safe'] else '[INJECTION_DETECTED]'}")
+            print(f"- Risk Score: {chk['risk_score']:.2f}")
+            if chk["detected_threats"]:
+                print(f"- Detected Signatures: {', '.join(chk['detected_threats'])}")
+            print()
+    elif subcmd == "sanitize":
+        p = Path(args.target)
+        if p.exists():
+            content = p.read_text(encoding="utf-8", errors="ignore")
+            print(SecurityGuardrails.sanitize_text(content))
+    else:
+        print("Usage: meet secure [audit|log4j [--fix]|check-prompt <text>|sanitize <file>]")
+
+
+def handle_advise(args):
+    analysis = TechStackAdvisor.analyze_idea(args.idea)
+    if args.json:
+        print(json.dumps(analysis, indent=2))
+    else:
+        print("\n" + TechStackAdvisor.format_advisor_markdown(analysis) + "\n")
+
+
+def handle_graph(args):
+    engine = CodeGraphEngine()
+    subcmd = args.graph_command
+
+    if subcmd == "build":
+        target = Path(args.path) if args.path else None
+        res = engine.build_graph(root_dir=target)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"\nBuilt Codebase Knowledge Graph:")
+            print(f"- Files Scanned: {res['files_scanned']}")
+            print(f"- Nodes Indexed: {res['nodes_indexed']}")
+            print(f"- Edges Indexed: {res['edges_indexed']}")
+            print(f"- Cypher Export: {res.get('cypher_file')}\n")
+    elif subcmd == "stats":
+        stats = engine.get_stats()
+        if args.json:
+            print(json.dumps(stats, indent=2))
+        else:
+            print(f"\nCodebase Knowledge Graph Statistics:")
+            print(f"- Total Nodes: {stats['total_nodes']}")
+            print(f"- Total Edges: {stats['total_edges']}")
+            print(f"- Node Breakdown: {stats['node_types']}")
+            print(f"- Edge Breakdown: {stats['relation_types']}\n")
+    elif subcmd == "query":
+        res = engine.query_symbol(args.symbol)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            print(f"\nQuery Symbol: '{args.symbol}' (Found {len(res['definitions'])} definitions, {len(res['callers'])} callers):")
+            for d in res["definitions"]:
+                print(f"- [{d['node_type'].upper()}] {d['name']} in {d['file_path']}:{d['start_line']}")
+                if d.get("signature"):
+                    print(f"  Signature: {d['signature']}")
+            if res["callers"]:
+                print("Referenced/Called by:")
+                for c in res["callers"][:5]:
+                    print(f"  * {c.get('name', c.get('node_id'))} ({c['file_path']}) [{c['relation_type']}]")
+            print()
+    elif subcmd == "visual":
+        out = Path(args.output) if args.output else None
+        path = CodeflowVisualizer.generate(output_file=out)
+        print(f"\nGenerated Standalone Visual Codeflow Canvas:")
+        print(f"Path: {path}")
+        print(f"Open this file in any browser to inspect interactive codebase graph (zero network needed).\n")
+    elif subcmd == "export":
+        out = Path(args.output) if args.output else None
+        path = engine.export_cypher(output_path=out)
+        print(f"\nExported Cypher script: {path}\n")
+    else:
+        print("Usage: meet graph [build|stats|query <symbol>|visual|export]")
+
+
+def handle_ask(args):
+    res = AskEngine.answer_query(args.query)
+    if args.json:
+        print(json.dumps(res, indent=2))
+    else:
+        print("\n" + res["dense_output"] + "\n")
+
+
+def handle_eval(args):
+    res = AutoEvalHarness.run_eval(custom_command=args.cmd, agent_name=args.agent)
+    if args.json:
+        print(json.dumps(res, indent=2))
+    else:
+        print(f"\nAutonomous Evaluation Harness:")
+        print(f"- Command:  {res.get('command')}")
+        print(f"- Status:   [{res.get('status')}]")
+        print(f"- Attempts: {res.get('attempts')}")
+        if res.get("checkpoint_id"):
+            print(f"- HITL Checkpoint ID: {res['checkpoint_id']}")
+        for h in res.get("history", []):
+            st = f"[{h['status']}]"
+            print(f"  * Attempt #{h['attempt']} {st}: {h.get('decisive_output') or h.get('decisive_error')}")
+        print()
+
+
+def handle_worktree(args):
+    subcmd = args.worktree_command
+    if subcmd == "list":
+        active = WorktreeManager.list_active()
+        if args.json:
+            print(json.dumps(active, indent=2))
+        else:
+            print(f"\nActive Worktrees & Sandboxes ({len(active)}):")
+            for item in active:
+                print(f"- [{item['mode']}] Task: {item['task_id']} (Path: {item['path']})")
+            print()
+    elif subcmd == "create":
+        res = WorktreeManager.create_worktree(task_id=args.task_id, team_id=args.team, agent_name=args.agent)
+        print(f"\nCreated Workspace Isolation:")
+        print(f"- Task: {res['task_id']}")
+        print(f"- Mode: {res['mode']}")
+        print(f"- Path: {res['path']}\n")
+    elif subcmd == "diff":
+        res = WorktreeManager.diff_worktree(task_id=args.task_id)
+        print(f"\nDiff for Task [{args.task_id}]:\n{res['diff']}\n")
+    elif subcmd == "merge":
+        res = WorktreeManager.merge_worktree(task_id=args.task_id)
+        print(f"\nMerged Task [{args.task_id}]: {res.get('status')}\n")
+    elif subcmd == "cleanup":
+        ok = WorktreeManager.cleanup_worktree(task_id=args.task_id)
+        print(f"\nCleanup Task [{args.task_id}]: {'SUCCESS' if ok else 'NOT_FOUND'}\n")
+    else:
+        print("Usage: meet worktree [list|create <id>|diff <id>|merge <id>|cleanup <id>]")
+
+
+def handle_dashboard(args):
+    if args.tui:
+        DashboardEngine.render_tui()
+    else:
+        DashboardEngine.start_web(port=args.port)
+
+
+def handle_ci(args):
+    res = CIBot.run_pr_review()
+    if args.json:
+        print(json.dumps(res, indent=2))
+    else:
+        print("\n" + res["review_markdown"] + "\n")
+
+
 def handle_doctor():
     format_header()
     print("Running Meet AI Agents System Health Check...")
@@ -787,6 +992,81 @@ def main():
     hitl_req.add_argument("--id", type=str, default=None, help="Optional explicit checkpoint ID")
     hitl_req.add_argument("--json", action="store_true", help="Output in JSON")
 
+    # Subcommand: secure
+    sec_parser = subparsers.add_parser("secure", help="AI Security Guardrails, secret redaction, .env shield, and Log4j scanner")
+    sec_sub = sec_parser.add_subparsers(dest="secure_command", help="Security action")
+    sec_audit = sec_sub.add_parser("audit", help="Audit workspace for secrets, PII, and exposed .env files")
+    sec_audit.add_argument("--json", action="store_true", help="Output in JSON")
+    sec_log4j = sec_sub.add_parser("log4j", help="Scan and patch Log4j JNDI CVE vulnerabilities")
+    sec_log4j.add_argument("--fix", action="store_true", help="Automatically patch vulnerable dependency versions")
+    sec_log4j.add_argument("--json", action="store_true", help="Output in JSON")
+    sec_chk = sec_sub.add_parser("check-prompt", help="Check prompt for jailbreak or injection attacks")
+    sec_chk.add_argument("prompt", type=str, help="Prompt text to validate")
+    sec_chk.add_argument("--json", action="store_true", help="Output in JSON")
+    sec_san = sec_sub.add_parser("sanitize", help="Sanitize/mask secrets and PII in a file")
+    sec_san.add_argument("target", type=str, help="File path to sanitize")
+
+    # Subcommand: advise
+    advise_parser = subparsers.add_parser("advise", help="Dynamic Tech Stack & Architecture Advisor for greenfield projects")
+    advise_parser.add_argument("idea", type=str, help="Project idea description")
+    advise_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: graph
+    graph_parser = subparsers.add_parser("graph", help="Codebase Knowledge Graph Engine & Visual Codeflow Explorer")
+    graph_sub = graph_parser.add_subparsers(dest="graph_command", help="Graph action")
+    graph_bld = graph_sub.add_parser("build", help="Parse AST and index codebase graph in SQLite + Cypher export")
+    graph_bld.add_argument("--path", type=str, default=None, help="Root path override")
+    graph_bld.add_argument("--json", action="store_true", help="Output in JSON")
+    graph_st = graph_sub.add_parser("stats", help="Show AST graph node and edge counts")
+    graph_st.add_argument("--json", action="store_true", help="Output in JSON")
+    graph_q = graph_sub.add_parser("query", help="Query symbol definitions, callers, and dependencies (0 tokens)")
+    graph_q.add_argument("symbol", type=str, help="Symbol or function name")
+    graph_q.add_argument("--json", action="store_true", help="Output in JSON")
+    graph_vis = graph_sub.add_parser("visual", help="Generate standalone interactive Codeflow HTML canvas")
+    graph_vis.add_argument("--output", type=str, default=None, help="Output HTML path")
+    graph_exp = graph_sub.add_parser("export", help="Export Neo4j Cypher script (.agent/context/code_graph.cyp)")
+    graph_exp.add_argument("--output", type=str, default=None, help="Output Cypher file path")
+
+    # Subcommand: ask
+    ask_parser = subparsers.add_parser("ask", help="Read-Only Ask Mode: Technical Q&A with zero codebase modifications")
+    ask_parser.add_argument("query", type=str, help="Question about the codebase")
+    ask_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: eval
+    eval_parser = subparsers.add_parser("eval", help="Autonomous Self-Healing & Auto-Eval Test Harness")
+    eval_sub = eval_parser.add_subparsers(dest="eval_command", help="Eval action")
+    eval_run = eval_sub.add_parser("run", help="Run automated evaluation test suite with retry loop")
+    eval_run.add_argument("--cmd", type=str, default=None, help="Custom test command override")
+    eval_run.add_argument("--agent", type=str, default="evaluator", help="Reporting agent name")
+    eval_run.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: worktree
+    wt_parser = subparsers.add_parser("worktree", help="Multi-Agent Git Worktree & Sandbox Workspace Isolation")
+    wt_sub = wt_parser.add_subparsers(dest="worktree_command", help="Worktree action")
+    wt_list = wt_sub.add_parser("list", help="List active worktrees and sandboxes")
+    wt_list.add_argument("--json", action="store_true", help="Output in JSON")
+    wt_create = wt_sub.add_parser("create", help="Create isolated worktree for a task")
+    wt_create.add_argument("task_id", type=str, help="Task ID")
+    wt_create.add_argument("--team", type=str, default="default", help="Team ID")
+    wt_create.add_argument("--agent", type=str, default="agent", help="Claiming agent name")
+    wt_diff = wt_sub.add_parser("diff", help="View worktree changes")
+    wt_diff.add_argument("task_id", type=str, help="Task ID")
+    wt_merge = wt_sub.add_parser("merge", help="Merge verified worktree changes back into main branch")
+    wt_merge.add_argument("task_id", type=str, help="Task ID")
+    wt_clean = wt_sub.add_parser("cleanup", help="Remove worktree and clean branch")
+    wt_clean.add_argument("task_id", type=str, help="Task ID")
+
+    # Subcommand: dashboard
+    dash_parser = subparsers.add_parser("dashboard", help="Live Mission Control Dashboard (Web GUI & Terminal TUI)")
+    dash_parser.add_argument("--web", action="store_true", default=True, help="Launch zero-dependency Web GUI (localhost:4242)")
+    dash_parser.add_argument("--tui", action="store_true", help="Display instantaneous terminal TUI board")
+    dash_parser.add_argument("--port", type=int, default=4242, help="HTTP port (default: 4242)")
+
+    # Subcommand: ci
+    ci_parser = subparsers.add_parser("ci", help="GitHub Actions CI PR review bot runner")
+    ci_parser.add_argument("action", nargs="?", choices=["review"], default="review")
+    ci_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
     # Subcommand: doctor
     subparsers.add_parser("doctor", help="Run system diagnostics")
 
@@ -829,6 +1109,22 @@ def main():
         handle_team(args)
     elif args.subcommand == "hitl":
         handle_hitl(args)
+    elif args.subcommand == "secure":
+        handle_secure(args)
+    elif args.subcommand == "advise":
+        handle_advise(args)
+    elif args.subcommand == "graph":
+        handle_graph(args)
+    elif args.subcommand == "ask":
+        handle_ask(args)
+    elif args.subcommand == "eval":
+        handle_eval(args)
+    elif args.subcommand == "worktree":
+        handle_worktree(args)
+    elif args.subcommand == "dashboard":
+        handle_dashboard(args)
+    elif args.subcommand == "ci":
+        handle_ci(args)
     elif args.subcommand == "doctor":
         handle_doctor()
     else:

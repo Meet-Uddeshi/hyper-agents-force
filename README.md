@@ -48,6 +48,11 @@
   - [Agent Team System Prompt Template](#agent-team-system-prompt-template)
   - [Example 3: Full-Stack Feature Team (Agent Team System)](#example-3-collaborative-full-stack-feature-team-agent-team-system)
   - [Example 4: Mobile Platform & Security Team (Agent Team System)](#example-4-mobile-platform--security-audit-team-agent-team-system)
+- [Manual On-Demand Workflows & Prompt Templates](#manual-on-demand-workflows--prompt-templates)
+  - [1. AI Security & Log4j Vulnerability Audit](#1-ai-security--log4j-vulnerability-audit)
+  - [2. Codeflow AST Knowledge Graph & Interactive Canvas](#2-codeflow-ast-knowledge-graph--interactive-canvas)
+  - [3. Greenfield Tech Stack & Architecture Advisor](#3-greenfield-tech-stack--architecture-advisor)
+  - [4. Read-Only Ask Mode & Dense Response Protocol](#4-read-only-ask-mode--dense-response-protocol)
 - [Memory & Shared Board System](#memory--shared-board-system)
 - [Verification & Test Suite](#verification--test-suite)
 - [License](#license)
@@ -353,6 +358,43 @@ hyper-agents-force run plan-and-solve   # Run architecture planning & execution
 
 # Intelligent Prompt Routing
 hyper-agents-force answer "Design a PostgreSQL schema with Prisma"
+
+# AI Security Guardrails & Log4j Scanner
+hyper-agents-force secure audit             # Audit workspace for exposed secrets, .env files, and injections
+hyper-agents-force secure log4j             # Scan pom.xml, gradle, and properties for Log4j CVEs
+hyper-agents-force secure log4j --fix       # Automatically patch vulnerable Log4j dependencies to 2.17.1
+
+# Greenfield Tech Stack & Architecture Advisor
+hyper-agents-force advise "Idea"            # Run dynamic architecture advisor and technology stack evaluator
+hyper-agents-force advise "Idea" --json     # Export structured recommendations to JSON
+
+# Zero-Configuration Codebase Knowledge Graph (Graphify & Codeflow)
+hyper-agents-force graph build              # Build AST knowledge graph in SQLite and export code_graph.cyp
+hyper-agents-force graph stats              # Inspect AST node counts, dependencies, and relation edges
+hyper-agents-force graph query "Symbol"     # Query symbol dependencies, callers, and relationships
+hyper-agents-force graph visual             # Generate standalone interactive CODEFLOW_GRAPH.html canvas
+
+# Read-Only Ask Mode (Dense Response Protocol)
+hyper-agents-force ask "Question"           # Zero-write Q&A runtime answering without file modifications
+hyper-agents-force ask "Question" --raw     # Output raw high-density answer payload
+
+# Autonomous Self-Healing Test Harness
+hyper-agents-force eval run                 # Run tests, intercept errors, capture decisive trace, retry loop
+hyper-agents-force eval run --cmd "pytest"  # Execute specific test command under self-healing retry loop
+
+# Multi-Agent Git Worktree Workspace Isolation
+hyper-agents-force worktree list            # List active isolated worktrees and sandboxes
+hyper-agents-force worktree create <name>   # Provision isolated worktree branch for agent task
+hyper-agents-force worktree diff <name>     # Inspect isolated worktree changes
+hyper-agents-force worktree merge <name>    # Merge validated worktree changes into main branch
+hyper-agents-force worktree cleanup <name>  # Safely dismantle worktree directory and branch
+
+# Live Mission Control Dashboard & Terminal TUI
+hyper-agents-force dashboard --web          # Launch zero-dependency web dashboard on port 4242
+hyper-agents-force dashboard --tui          # Launch live interactive terminal TUI status display
+
+# Continuous PR Bot & GitHub Actions
+hyper-agents-force ci review                # Run PR diff classifier, route specialist review, generate check card
 ```
 
 ---
@@ -694,6 +736,163 @@ Team Delivery Gate:
   5. Teammate `security-specialist` claims `task-003`, audits secure storage against token leakage, and sends direct peer message to `mobile-developer`.
   6. Teammate `mobile-automation-engineer` claims `task-004`, executes Appium test suite, and confirms all gestures and bio-prompts pass.
   7. Team Lead `mobile-developer` verifies full compliance and provides delivery sign-off.
+
+---
+
+## Manual On-Demand Workflows & Prompt Templates
+
+Neither the AI Security Guardrails audit nor the Codebase Knowledge Graph generation is executed automatically upon installation. They are completely optional and run strictly on-demand as per user choice to preserve user sovereignty, privacy, and performance.
+
+---
+
+### 1. AI Security & Log4j Vulnerability Audit
+
+Hyper Agents Force provides deterministic security guardrails to shield credentials, mask sensitive tokens and PII, sanitize prompt injections, and scan for vulnerable Log4j libraries.
+
+#### Prompt Template:
+```markdown
+Task:
+Audit workspace security guardrails and scan for Log4j vulnerabilities.
+
+Context:
+- Project Tech Stack: {e.g., Java, Spring Boot, Maven, React, Node.js}
+- Constraints: Ensure zero secret leakage, shield .env files, scan for CVE-2021-44228
+- Relevant Files: {e.g., pom.xml, .env, package.json}
+
+Deliverables:
+1. Security audit report covering credential shielding and PII exposure.
+2. Log4j dependency scan report identifying vulnerable components.
+3. Automated version patch if vulnerabilities exist.
+
+Verification:
+- Run meet secure audit
+- Run meet secure log4j --fix
+```
+
+#### CLI On-Demand Invocations:
+```bash
+# Run security audit on workspace
+hyper-agents-force secure audit
+
+# Scan Java / JVM dependencies for Log4j CVEs
+hyper-agents-force secure log4j
+
+# Scan and automatically patch vulnerable Log4j coordinates to 2.17.1
+hyper-agents-force secure log4j --fix
+```
+
+---
+
+### 2. Codeflow AST Knowledge Graph & Interactive Canvas
+
+Inspired by Codeflow and Graphify, Hyper Agents Force includes a zero-configuration codebase knowledge graph engine. It parses Python, TypeScript, JavaScript, Go, Rust, and Java into a local SQLite graph store (`.agent/context/code_graph.db`), automatically exports Neo4j Cypher statements to [`.agent/context/code_graph.cyp`](file:///d:/Personal/hyper-agents-force/.agent/context/code_graph.cyp) without requiring Neo4j or environment variables, and generates a standalone offline interactive visual canvas at [`.agent/context/CODEFLOW_GRAPH.html`](file:///d:/Personal/hyper-agents-force/.agent/context/CODEFLOW_GRAPH.html).
+
+#### Prompt Template:
+```markdown
+Task:
+Parse codebase AST knowledge graph and generate interactive visual codeflow canvas.
+
+Context:
+- Project Tech Stack: {e.g., Python, TypeScript, Go}
+- Storage: Embedded SQLite (Zero environment variables required)
+- Output Artifacts: .agent/context/code_graph.cyp and .agent/context/CODEFLOW_GRAPH.html
+
+Deliverables:
+1. SQLite knowledge graph mapping files, classes, functions, and import dependencies.
+2. Neo4j-compatible Cypher export for optional graph DB ingestion.
+3. Standalone offline HTML visualizer with pan, zoom, and node filtering.
+
+Verification:
+- Run meet graph build
+- Run meet graph visual
+```
+
+#### CLI On-Demand Invocations:
+```bash
+# Build SQLite AST knowledge graph and generate code_graph.cyp
+hyper-agents-force graph build
+
+# Inspect AST node counts, relationship edges, and dependency statistics
+hyper-agents-force graph stats
+
+# Query callers, callees, and dependencies for a symbol
+hyper-agents-force graph query "AuthService"
+
+# Generate standalone offline visual canvas
+hyper-agents-force graph visual
+```
+
+---
+
+### 3. Greenfield Tech Stack & Architecture Advisor
+
+When starting a project from scratch, the Tech Stack Advisor dynamically evaluates your idea, target audience, throughput requirements, and team constraints to recommend programming languages, frameworks, databases, and deployment architectures. Recommendations are computed dynamically via multi-criteria matrix evaluation rather than hardcoded tables.
+
+#### Prompt Template:
+```markdown
+I have an idea about {detailed description of your project concept, target audience, expected scale, and functional requirements}.
+```
+
+#### Alternative Structured Prompt Template:
+```markdown
+Task:
+Evaluate technology stack and system architecture for a new greenfield project.
+
+Idea:
+{Describe idea, e.g., Real-time collaborative whiteboard with multiplayer presence}
+
+Audience & Scale:
+- Target Users: {e.g., Enterprise design teams, 10,000 concurrent sessions}
+- Throughput: {e.g., Realtime sub-50ms sync, WebSocket streaming}
+- Platform: {e.g., Web, iOS, Desktop}
+
+Deliverables:
+1. Primary language and framework evaluation with trade-off rationale.
+2. Database and cache selection matching data access patterns.
+3. System architecture topology and deployment strategy.
+
+Verification:
+- Run meet advise "{Idea description}"
+```
+
+#### CLI On-Demand Invocations:
+```bash
+# Run dynamic advisory analysis
+hyper-agents-force advise "Realtime collaborative canvas with CRDT synchronization"
+
+# Output structured recommendations in JSON format
+hyper-agents-force advise "High-frequency crypto trading engine" --json
+```
+
+---
+
+### 4. Read-Only Ask Mode & Dense Response Protocol
+
+Ask Mode provides a guaranteed read-only Q&A environment with zero codebase modifications and zero file writes. It answers questions using the High-Efficiency Dense Response Protocol ([`global-rules/standards/dense-communication.md`](file:///d:/Personal/hyper-agents-force/global-rules/standards/dense-communication.md)), enforcing the 9 rules:
+1. **Answer first**: Pattern `[thing] [action] [reason]. [next step].`
+2. **Kill ceremony**: Zero greetings, hedging, or filler words.
+3. **Short words**: Concise vocabulary without invented abbreviations.
+4. **Articles optional**: High signal-to-noise ratio.
+5. **One idea per sentence**: ASD-STE100 standard floor (under 20 words per sentence).
+6. **Payload verbatim**: Exact code blocks, paths, and decisive error lines.
+7. **Bounded status**: Status text only for phase shifts.
+8. **User language**: Match language strictly.
+9. **Zero caveman**: Professional, dense, direct communication without artificial roleplay.
+
+#### Prompt Template:
+```markdown
+[ASK MODE]
+{Your technical question, debugging inquiry, or architectural question}
+```
+
+#### CLI On-Demand Invocations:
+```bash
+# Ask questions in read-only mode with dense response protocol
+hyper-agents-force ask "Why is the SQLite memory query bounded to LIMIT 5?"
+
+# Output raw high-density answer payload
+hyper-agents-force ask "What are the dependencies of the security guardrails engine?" --raw
+```
 
 ---
 

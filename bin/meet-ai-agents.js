@@ -191,7 +191,8 @@ function main() {
   const platform = getPlatform(args);
 
   // Direct deployment flags (-p, -u, -g) or platform-only flag (e.g. --cursor)
-  if (args.includes('-p') || args.includes('--project') || (platform && !['run', 'answer', 'memory', 'team', 'hitl', 'doctor', 'mcp', 'install'].includes(args[0]))) {
+  const knownCommands = ['run', 'answer', 'memory', 'team', 'hitl', 'secure', 'advise', 'graph', 'ask', 'eval', 'worktree', 'dashboard', 'ci', 'doctor', 'mcp', 'install'];
+  if (args.includes('-p') || args.includes('--project') || (platform && !knownCommands.includes(args[0]))) {
     let level = 'project';
     if (args.includes('-u') || args.includes('--user')) level = 'user';
     if (args.includes('-g') || args.includes('--global')) level = 'global';
@@ -227,26 +228,12 @@ function main() {
     if (fs.existsSync(wfRunner)) {
       spawnSync(process.execPath, [wfRunner, ...args], { stdio: 'inherit' });
     }
-  } else if (cmd === 'memory') {
+  } else if (['memory', 'team', 'hitl', 'secure', 'advise', 'graph', 'ask', 'eval', 'worktree', 'dashboard', 'ci'].includes(cmd)) {
     const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
     const cliPy = path.join(__dirname, 'cli.py');
     const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });
     if (res.error) {
-      console.error(`[ERROR] Failed to execute memory command via python: ${res.error.message}`);
-    }
-  } else if (cmd === 'team') {
-    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
-    const cliPy = path.join(__dirname, 'cli.py');
-    const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });
-    if (res.error) {
-      console.error(`[ERROR] Failed to execute team command via python: ${res.error.message}`);
-    }
-  } else if (cmd === 'hitl') {
-    const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
-    const cliPy = path.join(__dirname, 'cli.py');
-    const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });
-    if (res.error) {
-      console.error(`[ERROR] Failed to execute hitl command via python: ${res.error.message}`);
+      console.error(`[ERROR] Failed to execute ${cmd} command via python: ${res.error.message}`);
     }
   } else if (cmd === 'doctor') {
     handleDoctor();
