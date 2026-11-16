@@ -50,7 +50,13 @@ def test_node_cli():
     assert ("Deploying Hyper Agents Force to [GLOBAL] level" in out or "Deploying Meet AI Agents to [GLOBAL] level" in out)
     print("  [PASS] Node -g (global level) dry-run")
 
-    # 5. MCP list
+    # 5. Cursor install (--cursor dry-run)
+    out = run_cmd(["node", str(NODE_CLI), "--cursor", "--dry-run"])
+    assert "for [CURSOR] to [PROJECT] level" in out
+    assert "cursor adapter" in out
+    print("  [PASS] Node --cursor dry-run")
+
+    # 6. MCP list
     out = run_cmd(["node", str(NODE_CLI), "mcp"])
     assert "github" in out
     assert "jira" in out
@@ -86,6 +92,13 @@ def test_python_cli():
     assert data["target_level"] == "global"
     assert data["dry_run"] is True
     print("  [PASS] Python -g (global level) dry-run")
+
+    # 5. Cursor platform install (--cursor dry-run JSON)
+    out = run_cmd(["python", "-m", "bin.cli", "--cursor", "--dry-run", "--json"])
+    data = json.loads(out)
+    assert data["platform"] == "cursor"
+    assert any("cursor adapter" in a for a in data["actions"])
+    print("  [PASS] Python --cursor platform dry-run")
 
     # 5. MCP list (JSON)
     out = run_cmd(["python", "-m", "bin.cli", "mcp", "list", "--json"])

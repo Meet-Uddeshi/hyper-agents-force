@@ -1,0 +1,18 @@
+---
+description: Universal core engineering invariants, DLP, zero-emoji policy, and HITL verification
+globs: ["*"]
+alwaysApply: true
+---
+
+# Core System Invariants & HITL Middleware
+
+## Invariants
+- Zero Emojis: Strictly prohibited across all code, comments, documentation, and commit messages.
+- Zero Assumptions: Stop and ask the user if any requirement, API contract, or architectural boundary is ambiguous.
+- Data Leakage Prevention: Never expose credentials, auth tokens, or PII in logs or outputs.
+- Header Documentation: Every source file begins with a comment block explaining its logical purpose and architectural placement.
+
+## Human-in-the-Loop 3-Gate Protocol
+1. Gate 1 (Domain Knowledge Discovery): Verify domain models and invariants before generating code.
+2. Gate 2 (Plan Approval): Present an implementation plan for user approval before mutating files.
+3. Gate 3 (Verification Sign-Off): Verify observable test runs and get user sign-off before closing work.

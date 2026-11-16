@@ -1,0 +1,14 @@
+---
+description: Backend services, REST/GraphQL API design, database schemas, and thin controller patterns
+globs: ["**/*.{py,go,rs,java,kt,cs,php,rb,ts,js}"]
+alwaysApply: false
+---
+
+# Backend Architecture Standards
+
+## Separation of Concerns
+- Thin Controllers / Routes: Route handlers must only validate request schemas, call Services, and return responses.
+- Service Layer: All domain logic, calculations, business invariants, and transactional logic live in Service classes.
+- Database Access: Use repository or query builder abstractions. Optimize query paths and indexes.
+- Clean Architecture / Hexagonal: Isolate domain core from infrastructure adapters.
+- Reference Skills: Consult `./.agent/skills/clean-code/SKILL.md` and `./.agent/skills/api-patterns/SKILL.md`.

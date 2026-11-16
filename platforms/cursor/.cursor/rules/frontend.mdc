@@ -1,0 +1,14 @@
+---
+description: Frontend UI, component architecture, Tailwind styling, accessibility, and anti-slop guidelines
+globs: ["**/*.{tsx,jsx,ts,js,vue,svelte,css,scss,html}"]
+alwaysApply: false
+---
+
+# Frontend Engineering Standards
+
+## Component Architecture
+- React 19 / Next.js App Router / Vue 3 Composition standards.
+- Deep Design Thinking: Avoid purple-on-black AI slop templates. Use verified color tokens.
+- Accessibility (WCAG AAA): Enforce semantic HTML tags, ARIA attributes, keyboard navigation, and high contrast.
+- Performance: Memoize expensive computations; eliminate cascading re-renders.
+- Reference Skills: Consult `./.agent/skills/frontend-design/SKILL.md` and `./.agent/skills/unslop/SKILL.md`.

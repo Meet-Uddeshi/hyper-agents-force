@@ -1,0 +1,14 @@
+---
+description: Collaborative Agent Team coordination, shared task board claiming, and peer messaging
+globs: ["*"]
+alwaysApply: false
+---
+
+# Collaborative Agent Team Standards
+
+## Team Coordination Protocol
+- Invocation: Triggered by `$team-name` or collaborative multi-domain prompt templates.
+- Roles: Team Lead directs architecture and verifies delivery. Specialized teammates claim unblocked tasks atomically.
+- Shared Task Board: Synced in real time to `./.agent/context/TEAM_BOARD.md` from `./.agent/memory/memory.db`.
+- Peer-to-Peer Bus: Teammates exchange review comments and handoff artifacts using `meet team msg`.
+- Atomic Claiming: Tasks follow `BLOCKED -> UNCLAIMED -> IN_PROGRESS -> DONE`.

@@ -1,0 +1,14 @@
+---
+description: Automated test-driven development (TDD), unit testing, integration tests, and verification gates
+globs: ["**/*{test,spec}*.{py,ts,js,go,rs,java}"]
+alwaysApply: false
+---
+
+# Testing & Verification Standards
+
+## Test-Driven Development (TDD)
+- Red-Green-Refactor: Write failing automated tests first, implement minimal passing code, then refactor cleanly.
+- Mock Avoidance: Prefer real in-memory databases (SQLite) and contract-tested interfaces over brittle mocks.
+- Flaky Test Ban: Never swallow exceptions or use empty catch blocks. Implement condition-based waiting for async events.
+- Verification Gates: Run automated test suites before claiming any task completion.
+- Reference Skills: Consult `./.agent/skills/test-driven-development/SKILL.md` and `./.agent/skills/testing-patterns/SKILL.md`.

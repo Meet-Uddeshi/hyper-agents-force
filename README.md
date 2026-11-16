@@ -23,6 +23,10 @@
   - [Rules Architecture (Workspace & Domain)](#rules-architecture-workspace--domain)
   - [Workflow Automation Engine](#workflow-automation-engine)
 - [Global Rules Deployment](#global-rules-deployment)
+- [Universal Multi-Platform Support](#universal-multi-platform-support)
+  - [Supported IDEs & Agents](#supported-ides--agents)
+  - [Platform Directory Adapters](#platform-directory-adapters)
+  - [Targeted Platform Installation](#targeted-platform-installation)
 - [Installation & Quick Start](#installation--quick-start)
   - [1. Installation via UV (Recommended)](#1-installation-via-uv-recommended)
   - [2. Installation via Pip](#2-installation-via-pip)
@@ -174,6 +178,44 @@ hyper-agents-force install -g
 
 ---
 
+## Universal Multi-Platform Support
+
+Hyper Agents Force is built with a universal decoupled architecture. The shared intelligence core—including all 110 specialist agents, 377 domain skills, workflows, SQLite persistent memory, and Human-in-the-Loop (HITL) middleware—lives inside `.agent/`.
+
+Platform-specific adapters are stored independently inside `platforms/`:
+
+```
+platforms/
+├── cursor/              # Cursor IDE
+│   ├── .cursorrules     # Root rules with DLP, thin controllers & zero assumptions
+│   └── .cursor/
+│       ├── mcp.json     # Cursor Model Context Protocol server configuration
+│       └── rules/       # Modular MDC rules (core, team, frontend, backend, testing)
+├── claude/              # Claude Code
+│   ├── CLAUDE.md        # Root entry point with agent & team routing
+│   └── .mcp.json        # Claude MCP configuration
+├── copilot/             # GitHub Copilot
+│   └── .github/
+│       └── copilot-instructions.md  # Workspace instructions referencing .agent/
+├── codex/               # OpenAI Codex
+│   └── .codex/
+│       └── instructions.md          # Workspace instructions referencing .agent/
+├── gemini/              # Gemini CLI
+│   └── GEMINI.md        # Root instructions & prompt routing matrix
+└── antigravity/         # Google Antigravity
+    └── GEMINI.md        # Workspace instructions & prompt routing matrix
+```
+
+### Targeted Platform Installation
+
+When deploying with a platform flag (e.g., `--cursor`, `--claude`, `--copilot`, `--codex`, `--gemini`, or `--all`), the installer copies **only** the common `.agent/` runtime and that platform's specific configuration files into your destination project:
+
+- **Zero Workspace Clutter**: A Cursor project receives only `.cursorrules` and `.cursor/`—no stray `GEMINI.md` or `CLAUDE.md`. A Claude Code workspace receives only `CLAUDE.md` and `.mcp.json`.
+- **Shared Intelligence Core**: Regardless of IDE or CLI, all platforms share the exact same 110 agents, 377 skills, SQLite memory database, and HITL verification middleware.
+- **Universal Multi-Platform Deployment**: Using `--all` deploys adapters for every platform simultaneously, ideal for cross-functional teams using different tools on the same repository.
+
+---
+
 ## Installation & Quick Start
 
 Hyper Agents Force provides native support for **UV**, **Pip**, and **NPM**.
@@ -194,7 +236,12 @@ uv pip install -e .
 uv run hyper-agents-force --help
 
 # Option C: Deploy to your current project workspace
-uv run hyper-agents-force install -p
+uv run hyper-agents-force install -p                 # Default (Gemini/Antigravity)
+uv run hyper-agents-force install --cursor           # Cursor IDE (.cursorrules & .cursor/rules/)
+uv run hyper-agents-force install --claude           # Claude Code (CLAUDE.md & .mcp.json)
+uv run hyper-agents-force install --copilot          # GitHub Copilot (.github/)
+uv run hyper-agents-force install --codex            # OpenAI Codex (.codex/)
+uv run hyper-agents-force install --all              # Deploy all platform adapters simultaneously
 
 # Option D: Deploy to user global profile (~/.gemini/)
 uv run hyper-agents-force install -u
@@ -213,11 +260,14 @@ pip install -e .
 # Verify installation
 hyper-agents-force doctor
 
-# Deploy into the current project workspace
-hyper-agents-force install -p
-
-# Deploy into user profile (~/.gemini/)
-hyper-agents-force install -u
+# Deploy for your specific platform
+hyper-agents-force --cursor             # Deploy Cursor adapter + .agent/
+hyper-agents-force --claude             # Deploy Claude Code adapter + .agent/
+hyper-agents-force --copilot            # Deploy GitHub Copilot adapter + .agent/
+hyper-agents-force --codex              # Deploy OpenAI Codex adapter + .agent/
+hyper-agents-force --all                # Deploy all platform adapters simultaneously
+hyper-agents-force install -p           # Default deployment (./.agent/ & GEMINI.md)
+hyper-agents-force install -u           # Deploy into user profile (~/.gemini/)
 ```
 
 ### 3. Installation via NPM / NPX
@@ -226,13 +276,18 @@ For JavaScript, TypeScript, and Node.js environments:
 
 ```bash
 # Option A: Run directly with npx (zero installation)
-npx hyper-agents-force -p       # Deploy .agent/ & GEMINI.md to current project
-npx hyper-agents-force -u       # Deploy to user profile (~/.gemini/)
-npx hyper-agents-force doctor   # Run diagnostic health check
+npx hyper-agents-force --cursor         # Deploy Cursor adapter + .agent/
+npx hyper-agents-force --claude         # Deploy Claude Code adapter + .agent/
+npx hyper-agents-force --copilot        # Deploy GitHub Copilot adapter + .agent/
+npx hyper-agents-force --codex          # Deploy OpenAI Codex adapter + .agent/
+npx hyper-agents-force --all            # Deploy all platform adapters simultaneously
+npx hyper-agents-force -p               # Default deployment (./.agent/ & GEMINI.md)
+npx hyper-agents-force -u               # Deploy to user profile (~/.gemini/)
+npx hyper-agents-force doctor           # Run diagnostic health check
 
 # Option B: Install globally
 npm install -g .
-hyper-agents-force -p
+hyper-agents-force --cursor
 ```
 
 ---
@@ -245,8 +300,17 @@ The unified CLI (`hyper-agents-force`, `hyper`, `meet-ai`) provides complete con
 # System Health Check
 hyper-agents-force doctor
 
+# Targeted Platform Deployment
+hyper-agents-force --cursor             # Deploy Cursor rules (.cursorrules, .cursor/rules/*.mdc, mcp.json)
+hyper-agents-force --claude             # Deploy Claude Code entry point (CLAUDE.md, .mcp.json)
+hyper-agents-force --copilot            # Deploy GitHub Copilot instructions (.github/)
+hyper-agents-force --codex              # Deploy OpenAI Codex instructions (.codex/)
+hyper-agents-force --gemini             # Deploy Gemini CLI rules (GEMINI.md)
+hyper-agents-force --all                # Deploy all platform adapters simultaneously
+hyper-agents-force install --cursor -p  # Explicit platform install at project level
+
 # Multi-Level Deployment
-hyper-agents-force install -p           # Current project directory
+hyper-agents-force install -p           # Current project directory (default)
 hyper-agents-force install -u           # User profile level (~/.gemini/)
 hyper-agents-force install -g           # System-wide global level
 hyper-agents-force install -p --dry-run # Simulate deployment without file writes
@@ -658,10 +722,13 @@ Hyper Agents Force features a **unified SQLite + Markdown cognitive architecture
 
 ## Verification & Test Suite
 
-Verify that all agents, skills, memory engines, and routing matrices function correctly:
+Verify that all agents, skills, memory engines, routing matrices, and multi-platform adapters function correctly:
 
 ```bash
-# Run complete test suite (Intelligent Routing, Memory SQLite/FTS5, Workflow Engines, CLI)
+# Run multi-platform synchronization and compliance audit (zero emojis & byte caps)
+python bin/build_platforms.py
+
+# Run complete test suite (Platforms, Intelligent Routing, Memory SQLite/FTS5, HITL, Workflow Engines, CLI)
 python -m pytest .agent/scripts/ -v
 
 # Run 110-Agent Comprehensive Prompt-Trigger Matrix Verification

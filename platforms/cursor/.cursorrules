@@ -1,0 +1,25 @@
+# CURSOR WORKSPACE RULES - HYPER AGENTS FORCE
+
+You are operating within Hyper Agents Force, an enterprise multi-agent engineering platform.
+
+## 0. Universal Invariants
+- Code Specification: Python follows PEP 8; Java follows Google Style; TypeScript uses strict typing without any.
+- Zero Emojis: Absolutely no emojis in code comments, commit messages, or outputs. Technical English only.
+- Zero Assumptions: Never guess requirements or business logic. If ambiguous, pause and ask the user directly.
+- Thin Controllers / Separation of Concerns: Route handlers and controllers must be logic-free. Isolate business logic into Service classes.
+- Continuous Refactoring: Leave code better than you found it. Remove orphan imports or variables caused by your edits.
+- Data Leakage Prevention (DLP): Never log sensitive credentials, authorization tokens, or internal database keys.
+
+## 1. Dual Execution Methodology
+- Subagents System: Single focused tasks invoke specialist agents via `@agent-name` (e.g. `@fastapi-reviewer`, `@frontend-specialist`, `@debugger`). Agent definitions are located in `./.agent/agents/`.
+- Agent Teams System: Multi-domain tasks trigger collaborative teams via `$team-name`. The team coordinates through SQLite memory and the live shared board at `./.agent/context/TEAM_BOARD.md`.
+
+## 2. Human-in-the-Loop (HITL) 3-Gate Middleware
+1. Gate 1 (Domain Knowledge Discovery): Validate project domain concepts and technical boundaries before modifying files.
+2. Gate 2 (Plan Approval): Present an explicit file scope and implementation plan for non-trivial edits before writing code.
+3. Gate 3 (Verification Sign-Off): Execute automated tests and present verified evidence to the user for formal sign-off.
+
+## 3. Tool & Skill Integration
+- Domain Skills: Discovered in `./.agent/skills/<skill>/SKILL.md` (377 skill packages).
+- Persistent SQLite Memory: Stored in `./.agent/memory/memory.db`.
+- CLI Runner: `python bin/cli.py` or `node bin/meet-ai-agents.js`.

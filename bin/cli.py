@@ -6,7 +6,12 @@ Usage:
   meet -p                       # Deploy to current project (./.agent/ & GEMINI.md)
   meet -u                       # Deploy to user profile (~/.gemini/)
   meet -g                       # Deploy to system global level
-  meet install [-p|-u|-g]       # Explicit install command
+  meet --cursor                 # Deploy for Cursor IDE (.cursorrules & .cursor/rules/)
+  meet --claude                 # Deploy for Claude Code (CLAUDE.md & .mcp.json)
+  meet --copilot                # Deploy for GitHub Copilot (.github/copilot-instructions.md)
+  meet --codex                  # Deploy for OpenAI Codex (.codex/instructions.md)
+  meet --all                    # Deploy adapters for all platforms
+  meet install [--cursor|--claude|--copilot|--codex|--gemini|--all]
   meet mcp list                 # List configured MCP servers & credential readiness
   meet mcp test <server>        # Test MCP server configuration & tools
   meet mcp sync [-p|-u|-g]      # Sync MCP config to target level
@@ -23,6 +28,7 @@ import os
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = SCRIPT_DIR.parent
@@ -59,18 +65,39 @@ def format_header():
     print("================================================================================")
 
 
-def handle_install(level: str, custom_path=None, dry_run=False, json_output=False):
-    res = Installer.install(target_level=level, custom_path=custom_path, dry_run=dry_run)
+def handle_install(level: str, custom_path=None, platform=None, dry_run=False, json_output=False):
+    res = Installer.install(target_level=level, custom_path=custom_path, platform=platform, dry_run=dry_run)
     if json_output:
         print(json.dumps(res, indent=2))
     else:
         mode_str = "[DRY-RUN] " if dry_run else ""
-        print(f"\n{mode_str}Successfully deployed Meet AI Agents to [{level.upper()}] level.")
+        plat_str = f" for [{res['platform'].upper()}]" if res.get('platform') else ""
+        print(f"\n{mode_str}Successfully deployed Meet AI Agents{plat_str} to [{level.upper()}] level.")
         print(f"Destination: {res['destination']}")
         print("Actions taken:")
         for action in res["actions"]:
             print(f"  - {action}")
         print()
+
+
+def extract_platform(args) -> Optional[str]:
+    if getattr(args, "cursor", False):
+        return "cursor"
+    if getattr(args, "claude", False):
+        return "claude"
+    if getattr(args, "copilot", False):
+        return "copilot"
+    if getattr(args, "codex", False):
+        return "codex"
+    if getattr(args, "gemini", False):
+        return "gemini"
+    if getattr(args, "antigravity", False):
+        return "antigravity"
+    if getattr(args, "all", False):
+        return "all"
+    if getattr(args, "platform", None):
+        return args.platform.lower()
+    return None
 
 
 def handle_mcp(args):
@@ -560,19 +587,35 @@ def main():
     )
 
     # Top-level direct deployment flags
-    parser.add_argument("-p", "--project", action="store_true", help="Deploy to current project level (./.agent/ & GEMINI.md)")
+    parser.add_argument("-p", "--project", action="store_true", help="Deploy to current project level (./.agent/)")
     parser.add_argument("-u", "--user", action="store_true", help="Deploy to user profile level (~/.gemini/)")
     parser.add_argument("-g", "--global", dest="global_level", action="store_true", help="Deploy to system global level")
+    parser.add_argument("--cursor", action="store_true", help="Install adapter for Cursor IDE (.cursorrules, .cursor/)")
+    parser.add_argument("--claude", action="store_true", help="Install adapter for Claude Code (CLAUDE.md, .mcp.json)")
+    parser.add_argument("--copilot", action="store_true", help="Install adapter for GitHub Copilot (.github/)")
+    parser.add_argument("--codex", action="store_true", help="Install adapter for OpenAI Codex (.codex/)")
+    parser.add_argument("--gemini", action="store_true", help="Install adapter for Gemini CLI (GEMINI.md)")
+    parser.add_argument("--antigravity", action="store_true", help="Install adapter for Antigravity (GEMINI.md)")
+    parser.add_argument("--all", action="store_true", help="Install adapters for all supported platforms")
+    parser.add_argument("--platform", type=str, default=None, choices=Installer.SUPPORTED_PLATFORMS, help="Specify platform adapter")
     parser.add_argument("--dry-run", action="store_true", help="Simulate deployment without modifying disk")
     parser.add_argument("--json", action="store_true", help="Output results in JSON format")
 
     subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands")
 
     # Subcommand: install
-    install_parser = subparsers.add_parser("install", help="Deploy Meet AI Agents to target level")
+    install_parser = subparsers.add_parser("install", help="Deploy Meet AI Agents to target level and platform")
     install_parser.add_argument("-p", "--project", action="store_true", help="Target current project")
     install_parser.add_argument("-u", "--user", action="store_true", help="Target user profile (~/.gemini/)")
     install_parser.add_argument("-g", "--global", dest="global_level", action="store_true", help="Target system global")
+    install_parser.add_argument("--cursor", action="store_true", help="Install adapter for Cursor IDE (.cursorrules, .cursor/)")
+    install_parser.add_argument("--claude", action="store_true", help="Install adapter for Claude Code (CLAUDE.md, .mcp.json)")
+    install_parser.add_argument("--copilot", action="store_true", help="Install adapter for GitHub Copilot (.github/)")
+    install_parser.add_argument("--codex", action="store_true", help="Install adapter for OpenAI Codex (.codex/)")
+    install_parser.add_argument("--gemini", action="store_true", help="Install adapter for Gemini CLI (GEMINI.md)")
+    install_parser.add_argument("--antigravity", action="store_true", help="Install adapter for Antigravity (GEMINI.md)")
+    install_parser.add_argument("--all", action="store_true", help="Install adapters for all supported platforms")
+    install_parser.add_argument("--platform", type=str, default=None, choices=Installer.SUPPORTED_PLATFORMS, help="Specify platform adapter")
     install_parser.add_argument("--path", type=str, default=None, help="Custom target directory")
     install_parser.add_argument("--dry-run", action="store_true", help="Simulate without copying")
     install_parser.add_argument("--json", action="store_true", help="Output in JSON")
@@ -749,15 +792,19 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle direct flags (-p, -u, -g)
-    if args.project:
-        handle_install("project", dry_run=args.dry_run, json_output=args.json)
+    # Determine requested platform (if any)
+    platform = extract_platform(args)
+
+    # Handle direct flags (-p, -u, -g) or platform flags invoked directly
+    if args.project or (platform is not None and args.subcommand is None):
+        target = "user" if args.user else ("global" if args.global_level else "project")
+        handle_install(target, platform=platform, dry_run=args.dry_run, json_output=args.json)
         return
     elif args.user:
-        handle_install("user", dry_run=args.dry_run, json_output=args.json)
+        handle_install("user", platform=platform, dry_run=args.dry_run, json_output=args.json)
         return
     elif args.global_level:
-        handle_install("global", dry_run=args.dry_run, json_output=args.json)
+        handle_install("global", platform=platform, dry_run=args.dry_run, json_output=args.json)
         return
 
     # Handle subcommands
@@ -767,7 +814,7 @@ def main():
             level = "user"
         elif args.global_level:
             level = "global"
-        handle_install(level, custom_path=args.path, dry_run=args.dry_run, json_output=args.json)
+        handle_install(level, custom_path=args.path, platform=platform, dry_run=args.dry_run, json_output=args.json)
     elif args.subcommand == "mcp":
         handle_mcp(args)
     elif args.subcommand == "run":

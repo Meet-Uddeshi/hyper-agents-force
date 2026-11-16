@@ -21,7 +21,10 @@ const SOURCE_AGENT_DIR = path.join(WORKSPACE_DIR, '.agent');
 const SOURCE_GEMINI_MD = path.join(WORKSPACE_DIR, 'GEMINI.md');
 const SOURCE_ENV_EXAMPLE = path.join(WORKSPACE_DIR, '.env.example');
 const SOURCE_GLOBAL_RULES = path.join(WORKSPACE_DIR, 'global-rules');
+const SOURCE_PLATFORMS_DIR = path.join(WORKSPACE_DIR, 'platforms');
 const MCP_JSON_PATH = path.join(SOURCE_AGENT_DIR, 'mcp.json');
+
+const SUPPORTED_PLATFORMS = ['gemini', 'antigravity', 'claude', 'cursor', 'copilot', 'codex', 'all'];
 
 function copyRecursive(src, dst) {
   if (!fs.existsSync(src)) return;
@@ -49,7 +52,37 @@ function getGlobalDir() {
   return '/usr/local/share/antigravity';
 }
 
-function handleInstall(level, customPath = null, dryRun = false) {
+function getPlatform(args) {
+  if (args.includes('--cursor')) return 'cursor';
+  if (args.includes('--claude')) return 'claude';
+  if (args.includes('--copilot')) return 'copilot';
+  if (args.includes('--codex')) return 'codex';
+  if (args.includes('--gemini')) return 'gemini';
+  if (args.includes('--antigravity')) return 'antigravity';
+  if (args.includes('--all')) return 'all';
+  const platIdx = args.indexOf('--platform');
+  if (platIdx !== -1 && args[platIdx + 1]) {
+    return args[platIdx + 1].toLowerCase();
+  }
+  return null;
+}
+
+function deployPlatformFiles(platformName, destRoot, dryRun = false) {
+  const lookupName = platformName === 'antigravity' ? 'gemini' : platformName;
+  const platDir = path.join(SOURCE_PLATFORMS_DIR, lookupName);
+  if (!fs.existsSync(platDir)) return;
+
+  for (const item of fs.readdirSync(platDir)) {
+    const srcItem = path.join(platDir, item);
+    const dstItem = path.join(destRoot, item);
+    console.log(`  - Deploy ${lookupName} adapter [${item}] -> ${dstItem}`);
+    if (!dryRun) {
+      copyRecursive(srcItem, dstItem);
+    }
+  }
+}
+
+function handleInstall(level, customPath = null, dryRun = false, platform = null) {
   let destRoot;
   if (customPath) {
     destRoot = path.resolve(customPath);
@@ -64,32 +97,49 @@ function handleInstall(level, customPath = null, dryRun = false) {
     process.exit(1);
   }
 
+  const platKey = (platform || 'gemini').toLowerCase();
+  if (!SUPPORTED_PLATFORMS.includes(platKey)) {
+    console.error(`[ERROR] Unsupported platform: '${platform}'. Supported: ${SUPPORTED_PLATFORMS.join(', ')}`);
+    process.exit(1);
+  }
+
   const destAgent = path.join(destRoot, '.agent');
-  const destGemini = path.join(destRoot, 'GEMINI.md');
   const destEnvExample = path.join(destRoot, '.env.example');
   const destRules = (level === 'user' || level === 'u' || level === 'global' || level === 'g')
     ? path.join(destRoot, 'rules')
     : path.join(destRoot, 'global-rules');
 
-  console.log(`\n${dryRun ? '[DRY-RUN] ' : ''}Deploying Hyper Agents Force to [${level.toUpperCase()}] level...`);
+  const platDisplay = platform ? ` for [${platKey.toUpperCase()}]` : '';
+  console.log(`\n${dryRun ? '[DRY-RUN] ' : ''}Deploying Hyper Agents Force${platDisplay} to [${level.toUpperCase()}] level...`);
   console.log(`Target Destination: ${destRoot}`);
 
   if (!dryRun) {
     if (fs.existsSync(SOURCE_AGENT_DIR)) {
       copyRecursive(SOURCE_AGENT_DIR, destAgent);
-      console.log(`  - Deployed .agent/ bundle -> ${destAgent}`);
-    }
-    if (fs.existsSync(SOURCE_GEMINI_MD)) {
-      fs.copyFileSync(SOURCE_GEMINI_MD, destGemini);
-      console.log(`  - Deployed GEMINI.md -> ${destGemini}`);
+      console.log(`  - Deployed common .agent/ bundle -> ${destAgent}`);
     }
     if (fs.existsSync(SOURCE_ENV_EXAMPLE) && !fs.existsSync(path.join(destRoot, '.env'))) {
       fs.copyFileSync(SOURCE_ENV_EXAMPLE, destEnvExample);
       console.log(`  - Deployed .env.example -> ${destEnvExample}`);
     }
-    if (fs.existsSync(SOURCE_GLOBAL_RULES)) {
+  } else {
+    console.log(`  - Deploy common .agent/ bundle -> ${destAgent}`);
+    console.log(`  - Deploy .env.example -> ${destEnvExample}`);
+  }
+
+  // Deploy platform adapters
+  const platformsToDeploy = platKey === 'all'
+    ? ['gemini', 'claude', 'cursor', 'copilot', 'codex']
+    : [platKey];
+
+  for (const p of platformsToDeploy) {
+    deployPlatformFiles(p, destRoot, dryRun);
+  }
+
+  if (['gemini', 'antigravity', 'all'].includes(platKey) && fs.existsSync(SOURCE_GLOBAL_RULES)) {
+    console.log(`  - Deploy global rules -> ${destRules}`);
+    if (!dryRun) {
       copyRecursive(SOURCE_GLOBAL_RULES, destRules);
-      console.log(`  - Deployed global rules -> ${destRules}`);
     }
   }
 
@@ -138,18 +188,22 @@ function handleDoctor() {
 function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
+  const platform = getPlatform(args);
 
-  // Direct flags
-  if (args.includes('-p') || args.includes('--project')) {
-    handleInstall('project', null, dryRun);
+  // Direct deployment flags (-p, -u, -g) or platform-only flag (e.g. --cursor)
+  if (args.includes('-p') || args.includes('--project') || (platform && !['run', 'answer', 'memory', 'team', 'hitl', 'doctor', 'mcp', 'install'].includes(args[0]))) {
+    let level = 'project';
+    if (args.includes('-u') || args.includes('--user')) level = 'user';
+    if (args.includes('-g') || args.includes('--global')) level = 'global';
+    handleInstall(level, null, dryRun, platform);
     return;
   }
   if (args.includes('-u') || args.includes('--user')) {
-    handleInstall('user', null, dryRun);
+    handleInstall('user', null, dryRun, platform);
     return;
   }
   if (args.includes('-g') || args.includes('--global')) {
-    handleInstall('global', null, dryRun);
+    handleInstall('global', null, dryRun, platform);
     return;
   }
 
@@ -158,7 +212,7 @@ function main() {
     let level = 'project';
     if (args.includes('-u') || args.includes('--user')) level = 'user';
     if (args.includes('-g') || args.includes('--global')) level = 'global';
-    handleInstall(level, null, dryRun);
+    handleInstall(level, null, dryRun, platform);
   } else if (cmd === 'mcp') {
     handleMcpList();
   } else if (cmd === 'run') {
@@ -204,6 +258,12 @@ function main() {
     console.log('  meet -p                       # Deploy to current project (./.agent/ & GEMINI.md)');
     console.log('  meet -u                       # Deploy to user profile (~/.gemini/)');
     console.log('  meet -g                       # Deploy to system global level');
+    console.log('  meet --cursor                 # Deploy for Cursor IDE (.cursorrules & .cursor/rules/)');
+    console.log('  meet --claude                 # Deploy for Claude Code (CLAUDE.md & .mcp.json)');
+    console.log('  meet --copilot                # Deploy for GitHub Copilot (.github/)');
+    console.log('  meet --codex                  # Deploy for OpenAI Codex (.codex/)');
+    console.log('  meet --all                    # Deploy adapters for all platforms');
+    console.log('  meet install [--cursor|--claude|--copilot|--codex|--gemini|--all]');
     console.log('  meet mcp list                 # List configured MCP servers & credential readiness');
     console.log('  meet run <workflow>           # Execute workflow automation');
     console.log('  meet answer "<query>"         # Generate structured workflow answer');
