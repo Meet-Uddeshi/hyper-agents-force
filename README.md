@@ -231,48 +231,46 @@ Hyper Agents Force provides native support for **UV**, **Pip**, and **NPM**.
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/hyper-agents-force.git
+git clone https://github.com/Meet-Uddeshi/hyper-agents-force.git
 cd hyper-agents-force
 
-# Option A: Install into existing project virtualenv
+# Option A: Install into system Python
+uv pip install -e . --system
+
+# Option B: Install into project virtualenv
+uv venv
+.venv\Scripts\activate      # Windows (or: source .venv/bin/activate on Linux/macOS)
 uv pip install -e .
 
-# Option B: Run commands directly without installation
-uv run hyper-agents-force --help
+# Option C: Direct installation from GitHub without cloning
+uv tool install git+https://github.com/Meet-Uddeshi/hyper-agents-force.git
 
-# Option C: Deploy to your current project workspace
-uv run hyper-agents-force install -p                 # Default (Gemini/Antigravity)
-uv run hyper-agents-force install --cursor           # Cursor IDE (.cursorrules & .cursor/rules/)
-uv run hyper-agents-force install --claude           # Claude Code (CLAUDE.md & .mcp.json)
-uv run hyper-agents-force install --copilot          # GitHub Copilot (.github/)
-uv run hyper-agents-force install --codex            # OpenAI Codex (.codex/)
-uv run hyper-agents-force install --all              # Deploy all platform adapters simultaneously
-
-# Option D: Deploy to user global profile (~/.gemini/)
-uv run hyper-agents-force install -u
+# Verify installation
+hyper doctor
 ```
 
 ### 2. Installation via Pip
 
 ```bash
-# Clone and enter the repository
-git clone https://github.com/your-username/hyper-agents-force.git
+# Option A: Clone and install in editable mode
+git clone https://github.com/Meet-Uddeshi/hyper-agents-force.git
 cd hyper-agents-force
-
-# Install in editable mode
 pip install -e .
 
+# Option B: Direct install from GitHub
+pip install git+https://github.com/Meet-Uddeshi/hyper-agents-force.git
+
 # Verify installation
-hyper-agents-force doctor
+hyper doctor
 
 # Deploy for your specific platform
-hyper-agents-force --cursor             # Deploy Cursor adapter + .agent/
-hyper-agents-force --claude             # Deploy Claude Code adapter + .agent/
-hyper-agents-force --copilot            # Deploy GitHub Copilot adapter + .agent/
-hyper-agents-force --codex              # Deploy OpenAI Codex adapter + .agent/
-hyper-agents-force --all                # Deploy all platform adapters simultaneously
-hyper-agents-force install -p           # Default deployment (./.agent/ & GEMINI.md)
-hyper-agents-force install -u           # Deploy into user profile (~/.gemini/)
+hyper --cursor             # Deploy Cursor adapter + .agent/
+hyper --claude             # Deploy Claude Code adapter + .agent/
+hyper --copilot            # Deploy GitHub Copilot adapter + .agent/
+hyper --codex              # Deploy OpenAI Codex adapter + .agent/
+hyper --all                # Deploy all platform adapters simultaneously
+hyper install -p           # Default deployment (./.agent/ & GEMINI.md)
+hyper install -u           # Deploy into user profile (~/.gemini/)
 ```
 
 ### 3. Installation via NPM / NPX
@@ -280,19 +278,21 @@ hyper-agents-force install -u           # Deploy into user profile (~/.gemini/)
 For JavaScript, TypeScript, and Node.js environments:
 
 ```bash
-# Option A: Run directly with npx (zero installation)
-npx hyper-agents-force --cursor         # Deploy Cursor adapter + .agent/
-npx hyper-agents-force --claude         # Deploy Claude Code adapter + .agent/
-npx hyper-agents-force --copilot        # Deploy GitHub Copilot adapter + .agent/
-npx hyper-agents-force --codex          # Deploy OpenAI Codex adapter + .agent/
-npx hyper-agents-force --all            # Deploy all platform adapters simultaneously
-npx hyper-agents-force -p               # Default deployment (./.agent/ & GEMINI.md)
-npx hyper-agents-force -u               # Deploy to user profile (~/.gemini/)
-npx hyper-agents-force doctor           # Run diagnostic health check
+# Option A: Local link from cloned repository
+git clone https://github.com/Meet-Uddeshi/hyper-agents-force.git
+cd hyper-agents-force
+npm link
 
-# Option B: Install globally
-npm install -g .
-hyper-agents-force --cursor
+# Option B: Run directly via GitHub with npx (zero local cloning required)
+npx github:Meet-Uddeshi/hyper-agents-force --cursor
+npx github:Meet-Uddeshi/hyper-agents-force --claude
+npx github:Meet-Uddeshi/hyper-agents-force --copilot
+npx github:Meet-Uddeshi/hyper-agents-force --all
+npx github:Meet-Uddeshi/hyper-agents-force doctor
+
+# Option C: Run directly with Node without installation
+node bin/meet-ai-agents.js --cursor
+node bin/meet-ai-agents.js doctor
 ```
 
 ---
