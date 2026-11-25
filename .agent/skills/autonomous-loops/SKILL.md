@@ -602,15 +602,3 @@ These patterns compose well:
 5. **All agents in one context window** — For complex workflows, separate concerns into different agent processes. The reviewer should never be the author.
 
 6. **Ignoring file overlap in parallel work** — If two parallel agents might edit the same file, you need a merge strategy (sequential landing, rebase, or conflict resolution).
-
----
-
-## References
-
-| Project | Author | Link |
-|---------|--------|------|
-| Ralphinho | enitrat | credit: @enitrat |
-| Infinite Agentic Loop | disler | credit: @disler |
-| Continuous Claude | AnandChowdhary | credit: @AnandChowdhary |
-| NanoClaw | ECC | `/claw` command in this repo |
-| Verification Loop | ECC | `skills/verification-loop/` in this repo |

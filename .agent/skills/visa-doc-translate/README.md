@@ -81,6 +81,4 @@ pip install pytesseract
 - UK visa applications
 - EU visa applications
 
-## License
 
-MIT

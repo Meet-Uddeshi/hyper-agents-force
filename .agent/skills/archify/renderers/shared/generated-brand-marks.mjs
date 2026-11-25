@@ -817,10 +817,6 @@ export const BRAND_MARKS = Object.freeze([
       "provider": "Simple Icons",
       "providerVersion": "16.28.0",
       "source": "https://github.com/voodootikigod/logo.js/blob/1544bdeed6d618a6cfe4f0650d04ab8d9cfa76d9/js.svg",
-      "license": {
-        "type": "MIT",
-        "url": "https://spdx.org/licenses/MIT"
-      }
     }
   },
   {

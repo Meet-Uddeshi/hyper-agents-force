@@ -51,9 +51,6 @@ Brief one-line description.
 - [API Reference](./docs/api.md)
 - [Architecture](./docs/architecture.md)
 
-## License
-
-MIT
 ```
 
 ---

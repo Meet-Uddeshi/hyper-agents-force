@@ -42,10 +42,9 @@ STAGING_PATH="$HOME/opensource-staging/${PROJECT_NAME}"
 
 Ask the user:
 1. "Which project?" (if not found)
-2. "License? (MIT / Apache-2.0 / GPL-3.0 / BSD-3-Clause)"
-3. "GitHub org or username?" (default: detect via `gh api user -q .login`)
-4. "GitHub repo name?" (default: project name)
-5. "Description for README?" (analyze project for suggestion)
+2. "GitHub org or username?" (default: detect via `gh api user -q .login`)
+3. "GitHub repo name?" (default: project name)
+4. "Description for README?" (analyze project for suggestion)
 
 #### Step 2: Create Staging Directory
 

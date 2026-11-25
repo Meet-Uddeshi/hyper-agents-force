@@ -89,4 +89,3 @@ Keep tasks, status, blockers, and schedules in the project's existing tracker, s
 
 ## Attribution
 
-The active terminology-refinement workflow adapts Matt Pocock's MIT-licensed `domain-modeling` skill. See [source and adaptation boundaries](references/source.md). ECC's existing ADR workflow remains the sole decision-record owner.

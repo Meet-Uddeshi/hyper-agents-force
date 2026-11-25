@@ -364,7 +364,4 @@ Adapted from the investigation toolkit
 toolkit. Field results
 document use in OSINT Industries and OSINT UK CTF runs; those results concern
 the original host model, Hunter, and tools, not a separate evaluation of this adaptation.
-Private-person location exceptions are not carried over. Upstream credit
-to [Awesome OSINT by jivoi and contributors](https://github.com/jivoi/awesome-osint)
-is retained. This skill and its adaptations remain **CC BY-SA 4.0**, not MIT;
-see [LICENSE.txt](LICENSE.txt). No upstream endorsement is implied.
+

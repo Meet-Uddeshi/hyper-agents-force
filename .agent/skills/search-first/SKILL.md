@@ -54,7 +54,6 @@ Use this skill when:
 
 | Signal | Action |
 |--------|--------|
-| Exact match, well-maintained, MIT/Apache | **Adopt** — install and use directly |
 | Partial match, good foundation | **Extend** — install + write thin wrapper |
 | Multiple weak matches | **Compose** — combine 2-3 small packages |
 | Nothing suitable found | **Build** — write custom, but informed by research |
