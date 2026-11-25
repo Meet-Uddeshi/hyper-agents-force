@@ -34,10 +34,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_DIR = SCRIPT_DIR.parent
 AGENT_DIR = WORKSPACE_DIR / ".agent"
 SCRIPTS_DIR = AGENT_DIR / "scripts"
+HOOKS_DIR = AGENT_DIR / "hooks"
 
 sys.path.insert(0, str(WORKSPACE_DIR))
 sys.path.insert(0, str(SCRIPT_DIR))
 sys.path.insert(0, str(SCRIPTS_DIR))
+sys.path.insert(0, str(HOOKS_DIR))
 
 try:
     from bin.installer import Installer
@@ -55,6 +57,9 @@ try:
     from bin.worktree_manager import WorktreeManager
     from bin.dashboard import DashboardEngine
     from bin.ci_bot import CIBot
+    from hook_engine import HookEngine
+    from bin.context_bundler import ContextBundler
+    from bin.session_learner import SessionLearner
 except ImportError:
     from installer import Installer
     from mcp_manager import McpManager
@@ -71,6 +76,9 @@ except ImportError:
     from worktree_manager import WorktreeManager
     from dashboard import DashboardEngine
     from ci_bot import CIBot
+    from hook_engine import HookEngine
+    from context_bundler import ContextBundler
+    from session_learner import SessionLearner
 
 # Import workflow engine if available
 try:
@@ -758,6 +766,59 @@ def handle_ci(args):
         print("\n" + res["review_markdown"] + "\n")
 
 
+def handle_hook(args):
+    if args.stage == "pre-prompt":
+        res = HookEngine.pre_prompt(prompt=args.prompt, agent=args.agent)
+    elif args.stage == "pre-tool":
+        res = HookEngine.pre_tool_use(
+            tool_name=args.tool,
+            file_path=args.file,
+            command=args.command,
+            checkpoint_id=args.checkpoint,
+            agent=args.agent or "hook-engine",
+        )
+    elif args.stage == "post-tool":
+        res = HookEngine.post_tool_use(file_path=args.file, agent=args.agent or "hook-engine")
+    else:
+        res = HookEngine.stop(
+            run_eval=args.run_eval,
+            cmd=args.eval_cmd,
+            response_text=args.response,
+            agent=args.agent or "hook-engine",
+        )
+
+    if args.json:
+        print(json.dumps(res, indent=2))
+    else:
+        tag = "[ALLOW]" if res["decision"] == "allow" else "[BLOCKED]"
+        print(f"\n{tag} ({res['stage']}) {res['reason']}\n")
+        if res.get("context_markdown"):
+            print(res["context_markdown"] + "\n")
+    sys.exit(res["exit_code"])
+
+
+def handle_context(args):
+    data = ContextBundler.bundle(prompt=args.prompt, agent=args.agent)
+    if args.json:
+        print(json.dumps(data, indent=2))
+    else:
+        print("\n" + ContextBundler.render_markdown(data) + "\n")
+
+
+def handle_learn(args):
+    res = SessionLearner.record_learning(
+        key=args.key,
+        summary=args.summary,
+        category=args.category,
+        agent=args.agent,
+        tags=args.tags,
+    )
+    if args.json:
+        print(json.dumps(res, indent=2))
+    else:
+        print(f"\n[OK] Recorded {res['category']} learning `{res['key']}` (id={res['id']})\n")
+
+
 def handle_doctor():
     format_header()
     print("Running Meet AI Agents System Health Check...")
@@ -1067,6 +1128,35 @@ def main():
     ci_parser.add_argument("action", nargs="?", choices=["review"], default="review")
     ci_parser.add_argument("--json", action="store_true", help="Output in JSON")
 
+    # Subcommand: hook
+    hook_parser = subparsers.add_parser("hook", help="Deterministic Pre-AI & Post-AI guardrail hooks")
+    hook_parser.add_argument("stage", choices=["pre-prompt", "pre-tool", "post-tool", "stop"], help="Hook stage")
+    hook_parser.add_argument("--prompt", type=str, default="", help="User prompt text")
+    hook_parser.add_argument("--agent", type=str, default=None, help="Target agent name")
+    hook_parser.add_argument("--tool", type=str, default="", help="Tool name")
+    hook_parser.add_argument("--file", type=str, default="", help="Target file path")
+    hook_parser.add_argument("--command", type=str, default="", help="Shell command")
+    hook_parser.add_argument("--checkpoint", type=str, default="", help="HITL checkpoint ID")
+    hook_parser.add_argument("--response", type=str, default="", help="AI response text")
+    hook_parser.add_argument("--run-eval", action="store_true", help="Run test verification on stop")
+    hook_parser.add_argument("--eval-cmd", type=str, default=None, help="Explicit test command")
+    hook_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: context
+    ctx_parser = subparsers.add_parser("context", help="Bundle FTS5 memory, AST graph, and routing for a prompt")
+    ctx_parser.add_argument("prompt", type=str, help="Prompt or task description")
+    ctx_parser.add_argument("--agent", type=str, default=None, help="Explicit specialist agent")
+    ctx_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
+    # Subcommand: learn
+    learn_parser = subparsers.add_parser("learn", help="Record failure or pattern into persistent SQLite memory")
+    learn_parser.add_argument("--key", type=str, required=True, help="Unique learning key")
+    learn_parser.add_argument("--summary", type=str, required=True, help="Failure or pattern summary")
+    learn_parser.add_argument("--category", type=str, default="failure", help="Category (failure, pattern, invariant)")
+    learn_parser.add_argument("--agent", type=str, default="session-learner", help="Author agent")
+    learn_parser.add_argument("--tags", type=str, default="auto-learned", help="Comma-separated tags")
+    learn_parser.add_argument("--json", action="store_true", help="Output in JSON")
+
     # Subcommand: doctor
     subparsers.add_parser("doctor", help="Run system diagnostics")
 
@@ -1125,6 +1215,12 @@ def main():
         handle_dashboard(args)
     elif args.subcommand == "ci":
         handle_ci(args)
+    elif args.subcommand == "hook":
+        handle_hook(args)
+    elif args.subcommand == "context":
+        handle_context(args)
+    elif args.subcommand == "learn":
+        handle_learn(args)
     elif args.subcommand == "doctor":
         handle_doctor()
     else:

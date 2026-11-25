@@ -17,13 +17,11 @@ WORKSPACE_DIR = Path(__file__).resolve().parent.parent
 
 try:
     from bin.code_graph import CodeGraphEngine
-    from bin.workflow_engine import WorkflowEngine
 except ImportError:
-    from code_graph import CodeGraphEngine
     try:
-        from workflow_engine import WorkflowEngine
+        from code_graph import CodeGraphEngine
     except ImportError:
-        WorkflowEngine = None
+        CodeGraphEngine = None
 
 
 class AskEngine:

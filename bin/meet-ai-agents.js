@@ -228,7 +228,7 @@ function main() {
     if (fs.existsSync(wfRunner)) {
       spawnSync(process.execPath, [wfRunner, ...args], { stdio: 'inherit' });
     }
-  } else if (['memory', 'team', 'hitl', 'secure', 'advise', 'graph', 'ask', 'eval', 'worktree', 'dashboard', 'ci'].includes(cmd)) {
+  } else if (['memory', 'team', 'hitl', 'secure', 'advise', 'graph', 'ask', 'eval', 'worktree', 'dashboard', 'ci', 'hook', 'context', 'learn'].includes(cmd)) {
     const pythonExe = process.platform === 'win32' ? 'python' : 'python3';
     const cliPy = path.join(__dirname, 'cli.py');
     const res = spawnSync(pythonExe, [cliPy, ...args], { stdio: 'inherit' });

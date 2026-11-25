@@ -12,6 +12,7 @@ import re
 import sys
 import ast
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -47,10 +48,15 @@ class CodeGraphEngine:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def _get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_connection(self):
         conn = sqlite3.connect(str(self.db_path))
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            with conn:
+                yield conn
+        finally:
+            conn.close()
 
     def _init_schema(self) -> None:
         """Initializes graph nodes and edges schema."""

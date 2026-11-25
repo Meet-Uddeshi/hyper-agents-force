@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "node .agent/hooks/hook_runner.js pre-prompt"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "node .agent/hooks/hook_runner.js pre-tool"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "node .agent/hooks/hook_runner.js post-tool"
+      }
+    ],
+    "stop": [
+      {
+        "command": "node .agent/hooks/hook_runner.js stop"
+      }
+    ]
+  }
+}

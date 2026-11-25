@@ -89,35 +89,42 @@ class SecurityGuardrails:
         redactions = []
 
         for secret_type, pattern in SECRET_PATTERNS:
+            if not pattern.search(sanitized):
+                continue
             if secret_type == "DB_CREDENTIAL_URL":
-                for match in pattern.finditer(sanitized):
-                    redactions.append({"type": secret_type, "masked": "***"})
-                sanitized = pattern.sub(r"\1[REDACTED_PASSWORD]\3", sanitized)
+                sanitized, count = pattern.subn(r"\1[REDACTED_PASSWORD]\3", sanitized)
+                if count:
+                    redactions.extend({"type": secret_type, "masked": "***"} for _ in range(count))
             else:
-                for match in pattern.finditer(sanitized):
-                    redactions.append({"type": secret_type, "masked": match.group(0)[:4] + "..."})
-                sanitized = pattern.sub(f"[REDACTED_SECRET:{secret_type}]", sanitized)
+                def _repl(m, st=secret_type):
+                    redactions.append({"type": st, "masked": m.group(0)[:4] + "..."})
+                    return f"[REDACTED_SECRET:{st}]"
+                sanitized = pattern.sub(_repl, sanitized)
 
         return sanitized, redactions
 
     @classmethod
     def mask_pii(cls, content: str) -> Tuple[str, List[Dict[str, str]]]:
-        """Redacts emails, IP addresses, and phone identifiers."""
+        """Redacts emails and IP addresses."""
         sanitized = content
         redactions = []
 
         for pii_type, pattern in PII_PATTERNS:
-            # Avoid masking localhost or 0.0.0.0
+            if not pattern.search(sanitized):
+                continue
             if pii_type == "IPV4_ADDR":
-                for match in pattern.finditer(sanitized):
-                    ip = match.group(0)
-                    if ip not in ("127.0.0.1", "0.0.0.0", "255.255.255.255"):
-                        redactions.append({"type": pii_type, "masked": ip})
-                        sanitized = sanitized.replace(ip, f"[REDACTED_PII:{pii_type}]")
+                def _ip_repl(m):
+                    ip = m.group(0)
+                    if ip in ("127.0.0.1", "0.0.0.0", "255.255.255.255"):
+                        return ip
+                    redactions.append({"type": "IPV4_ADDR", "masked": ip})
+                    return "[REDACTED_PII:IPV4_ADDR]"
+                sanitized = pattern.sub(_ip_repl, sanitized)
             else:
-                for match in pattern.finditer(sanitized):
-                    redactions.append({"type": pii_type, "masked": match.group(0)})
-                sanitized = pattern.sub(f"[REDACTED_PII:{pii_type}]", sanitized)
+                def _pii_repl(m, pt=pii_type):
+                    redactions.append({"type": pt, "masked": m.group(0)})
+                    return f"[REDACTED_PII:{pt}]"
+                sanitized = pattern.sub(_pii_repl, sanitized)
 
         return sanitized, redactions
 
