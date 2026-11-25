@@ -36,13 +36,22 @@ def create_app():
         test_file.write_text(mock_py, encoding="utf-8")
 
         db_path = tmp_path / "test_graph.db"
+        out_dir = tmp_path / "out"
         engine = CodeGraphEngine(db_path=db_path)
-        res = engine.build_graph(root_dir=tmp_path)
+        res = engine.build_graph(root_dir=tmp_path, out_dir=out_dir)
 
         assert res["status"] == "SUCCESS"
         assert res["files_scanned"] == 1
         assert res["nodes_indexed"] >= 3
         assert res["edges_indexed"] >= 3
+        assert res["communities_count"] >= 1
+        assert (out_dir / "GRAPH_REPORT.md").exists()
+        assert (out_dir / "graph.json").exists()
+
+        # Verify SHA-256 incremental caching skips unchanged files
+        inc = engine.build_graph(root_dir=tmp_path, clear_existing=False, incremental=True, out_dir=out_dir)
+        assert inc["files_cached"] == 1
+        assert inc["nodes_indexed"] == 0
 
         # Test query symbol
         q = engine.query_symbol("UserService")
@@ -59,8 +68,9 @@ def test_cypher_export():
         test_file.write_text("class Core:\n    pass\n", encoding="utf-8")
 
         db_path = tmp_path / "test_graph.db"
+        out_dir = tmp_path / "out"
         engine = CodeGraphEngine(db_path=db_path)
-        engine.build_graph(root_dir=tmp_path)
+        engine.build_graph(root_dir=tmp_path, out_dir=out_dir)
 
         cyp_path = tmp_path / "test.cyp"
         engine.export_cypher(output_path=cyp_path)

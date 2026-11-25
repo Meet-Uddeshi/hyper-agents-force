@@ -11,7 +11,10 @@ import os
 import re
 import sys
 import ast
+import json
+import hashlib
 import sqlite3
+from collections import defaultdict, Counter
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -73,6 +76,8 @@ class CodeGraphEngine:
                     signature TEXT,
                     docstring TEXT,
                     language TEXT,
+                    community_id INTEGER DEFAULT -1,
+                    degree INTEGER DEFAULT 0,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
             """)
@@ -83,12 +88,32 @@ class CodeGraphEngine:
                     target_id TEXT NOT NULL,
                     relation_type TEXT NOT NULL,
                     context TEXT,
+                    confidence TEXT DEFAULT 'EXTRACTED',
                     FOREIGN KEY (source_id) REFERENCES code_nodes(node_id),
                     FOREIGN KEY (target_id) REFERENCES code_nodes(node_id)
                 );
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS code_file_hashes (
+                    file_path TEXT PRIMARY KEY,
+                    sha256 TEXT NOT NULL,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            # Safe schema migration for existing memory.db files
+            node_cols = {r[1] for r in cur.execute("PRAGMA table_info(code_nodes);").fetchall()}
+            if "community_id" not in node_cols:
+                cur.execute("ALTER TABLE code_nodes ADD COLUMN community_id INTEGER DEFAULT -1;")
+            if "degree" not in node_cols:
+                cur.execute("ALTER TABLE code_nodes ADD COLUMN degree INTEGER DEFAULT 0;")
+
+            edge_cols = {r[1] for r in cur.execute("PRAGMA table_info(code_edges);").fetchall()}
+            if "confidence" not in edge_cols:
+                cur.execute("ALTER TABLE code_edges ADD COLUMN confidence TEXT DEFAULT 'EXTRACTED';")
+
             cur.execute("CREATE INDEX IF NOT EXISTS idx_code_nodes_name ON code_nodes(name);")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_code_nodes_type ON code_nodes(node_type, file_path);")
+            cur.execute("CREATE INDEX IF NOT EXISTS idx_code_nodes_comm ON code_nodes(community_id);")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_code_edges_source ON code_edges(source_id, relation_type);")
             cur.execute("CREATE INDEX IF NOT EXISTS idx_code_edges_target ON code_edges(target_id, relation_type);")
             conn.commit()
@@ -161,7 +186,18 @@ class CodeGraphEngine:
                     "target_id": class_id,
                     "relation_type": "defines",
                     "context": "class definition",
+                    "confidence": "EXTRACTED",
                 })
+                for base in node.bases:
+                    base_name = ast.unparse(base) if hasattr(ast, "unparse") else getattr(base, "id", "")
+                    if base_name:
+                        edges.append({
+                            "source_id": class_id,
+                            "target_id": f"symbol:{base_name}",
+                            "relation_type": "inherits",
+                            "context": f"class {node.name}({base_name})",
+                            "confidence": "EXTRACTED",
+                        })
 
                 for base in node.bases:
                     if isinstance(base, ast.Name):
@@ -328,19 +364,35 @@ class CodeGraphEngine:
 
         return nodes, edges
 
-    def build_graph(self, root_dir: Optional[Path] = None, clear_existing: bool = True) -> Dict[str, Any]:
-        """Scans workspace and indexes all source files into the graph database."""
+    def build_graph(
+        self,
+        root_dir: Optional[Path] = None,
+        clear_existing: bool = True,
+        incremental: bool = False,
+        out_dir: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """Scans workspace with SHA-256 caching, builds AST graph, detects communities, and exports reports."""
         root = Path(root_dir or WORKSPACE_DIR).resolve()
+        context_dir = Path(out_dir or (WORKSPACE_DIR / ".agent" / "context")).resolve()
+        context_dir.mkdir(parents=True, exist_ok=True)
 
-        if clear_existing:
+        existing_hashes: Dict[str, str] = {}
+        if clear_existing and not incremental:
             with self._get_connection() as conn:
                 conn.execute("DELETE FROM code_nodes;")
                 conn.execute("DELETE FROM code_edges;")
+                conn.execute("DELETE FROM code_file_hashes;")
                 conn.commit()
+        else:
+            with self._get_connection() as conn:
+                rows = conn.execute("SELECT file_path, sha256 FROM code_file_hashes;").fetchall()
+                existing_hashes = {r["file_path"]: r["sha256"] for r in rows}
 
         total_files = 0
+        skipped_cached = 0
         all_nodes = []
         all_edges = []
+        updated_hashes: List[Tuple[str, str]] = []
 
         for p in root.rglob("*"):
             if not p.is_file():
@@ -355,6 +407,18 @@ class CodeGraphEngine:
             rel_str = str(p.relative_to(root)).replace("\\", "/")
             total_files += 1
 
+            try:
+                file_hash = hashlib.sha256(p.read_bytes()).hexdigest()
+            except Exception:
+                file_hash = ""
+
+            if incremental and file_hash and existing_hashes.get(rel_str) == file_hash:
+                skipped_cached += 1
+                continue
+
+            if file_hash:
+                updated_hashes.append((rel_str, file_hash))
+
             if lang == "python":
                 n, e = self.parse_python_file(p, rel_str)
             else:
@@ -363,9 +427,14 @@ class CodeGraphEngine:
             all_nodes.extend(n)
             all_edges.extend(e)
 
-        # Batch insert
         with self._get_connection() as conn:
             cur = conn.cursor()
+            if incremental and updated_hashes:
+                changed_paths = [fp for fp, _ in updated_hashes]
+                placeholders = ",".join("?" for _ in changed_paths)
+                cur.execute(f"DELETE FROM code_edges WHERE source_id IN (SELECT node_id FROM code_nodes WHERE file_path IN ({placeholders}));", changed_paths)
+                cur.execute(f"DELETE FROM code_nodes WHERE file_path IN ({placeholders});", changed_paths)
+
             for node in all_nodes:
                 cur.execute("""
                     INSERT OR REPLACE INTO code_nodes
@@ -378,22 +447,232 @@ class CodeGraphEngine:
 
             for edge in all_edges:
                 cur.execute("""
-                    INSERT INTO code_edges (source_id, target_id, relation_type, context)
-                    VALUES (?, ?, ?, ?)
-                """, (edge["source_id"], edge["target_id"], edge["relation_type"], edge.get("context", "")))
+                    INSERT INTO code_edges (source_id, target_id, relation_type, context, confidence)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    edge["source_id"], edge["target_id"], edge["relation_type"],
+                    edge.get("context", ""), edge.get("confidence", "EXTRACTED")
+                ))
+
+            for fp, fh in updated_hashes:
+                cur.execute("""
+                    INSERT OR REPLACE INTO code_file_hashes (file_path, sha256, updated_at)
+                    VALUES (?, ?, CURRENT_TIMESTAMP)
+                """, (fp, fh))
             conn.commit()
 
-        # Auto-export standalone Cypher script for Neo4j (zero env configuration needed)
-        cypher_file = self.export_cypher()
+        topology = self.detect_communities_and_god_nodes()
+        cypher_file = self.export_cypher(output_path=context_dir / "code_graph.cyp")
+        report_file = self.export_graph_report(topology=topology, output_path=context_dir / "GRAPH_REPORT.md")
+        json_file = self.export_graphify_json(topology=topology, output_path=context_dir / "graph.json")
 
         return {
             "root_dir": str(root),
             "files_scanned": total_files,
+            "files_cached": skipped_cached,
             "nodes_indexed": len(all_nodes),
             "edges_indexed": len(all_edges),
+            "communities_count": len(topology["communities"]),
+            "god_nodes": topology["god_nodes"][:5],
             "cypher_file": str(cypher_file),
+            "report_file": str(report_file),
+            "json_file": str(json_file),
             "status": "SUCCESS",
         }
+
+    def detect_communities_and_god_nodes(self) -> Dict[str, Any]:
+        """Runs community clustering and computes degree centrality (God Nodes)."""
+        with self._get_connection() as conn:
+            nodes = [dict(r) for r in conn.execute("SELECT node_id, name, node_type, file_path FROM code_nodes;").fetchall()]
+            edges = [dict(r) for r in conn.execute("SELECT source_id, target_id, relation_type, confidence FROM code_edges;").fetchall()]
+
+        node_ids = {n["node_id"] for n in nodes}
+        node_map = {n["node_id"]: n for n in nodes}
+        adj: Dict[str, set] = defaultdict(set)
+        degrees: Counter = Counter()
+
+        for e in edges:
+            src, dst = e["source_id"], e["target_id"]
+            degrees[src] += 1
+            degrees[dst] += 1
+            if src in node_ids and dst in node_ids and src != dst:
+                adj[src].add(dst)
+                adj[dst].add(src)
+
+        communities_list: List[List[str]] = []
+        used_networkx = False
+        try:
+            import networkx as nx
+            g = nx.Graph()
+            g.add_nodes_from(node_ids)
+            for u, nbrs in adj.items():
+                for v in nbrs:
+                    g.add_edge(u, v)
+            if g.number_of_edges() > 0:
+                comms = nx.community.louvain_communities(g, seed=42)
+                communities_list = [sorted(list(c)) for c in comms]
+                used_networkx = True
+        except Exception:
+            pass
+
+        if not used_networkx:
+            # Pure-Python deterministic Label Propagation fallback
+            labels = {nid: idx for idx, nid in enumerate(sorted(node_ids))}
+            for _ in range(8):
+                changed = False
+                for nid in sorted(node_ids):
+                    nbrs = adj.get(nid)
+                    if not nbrs:
+                        continue
+                    freq = Counter(labels[nb] for nb in nbrs)
+                    best = min(lbl for lbl, cnt in freq.items() if cnt == max(freq.values()))
+                    if best != labels[nid]:
+                        labels[nid] = best
+                        changed = True
+                if not changed:
+                    break
+            grouped: Dict[int, List[str]] = defaultdict(list)
+            for nid, lbl in labels.items():
+                grouped[lbl].append(nid)
+            communities_list = sorted(grouped.values(), key=len, reverse=True)
+
+        # Assign sequential community_id sorted by size
+        communities_list.sort(key=len, reverse=True)
+        node_to_comm: Dict[str, int] = {}
+        community_summaries: List[Dict[str, Any]] = []
+
+        for cid, members in enumerate(communities_list):
+            for nid in members:
+                node_to_comm[nid] = cid
+            internal_edges = sum(
+                1 for nid in members for nb in adj.get(nid, ()) if node_to_comm.get(nb, cid) == cid and nid < nb
+            )
+            max_possible = max(1, len(members) * (len(members) - 1) // 2)
+            cohesion = round(min(1.0, internal_edges / max_possible), 2)
+            files = sorted({node_map[nid]["file_path"] for nid in members if nid in node_map})
+            top_nodes = sorted(members, key=lambda x: degrees[x], reverse=True)[:5]
+            community_summaries.append({
+                "community_id": cid,
+                "size": len(members),
+                "cohesion": cohesion,
+                "files": files[:8],
+                "top_symbols": [node_map[nid]["name"] for nid in top_nodes if nid in node_map],
+            })
+
+        with self._get_connection() as conn:
+            cur = conn.cursor()
+            for nid in node_ids:
+                cur.execute(
+                    "UPDATE code_nodes SET community_id = ?, degree = ? WHERE node_id = ?",
+                    (node_to_comm.get(nid, -1), degrees.get(nid, 0), nid),
+                )
+            conn.commit()
+
+        god_nodes = [
+            {
+                "node_id": nid,
+                "name": node_map[nid]["name"],
+                "node_type": node_map[nid]["node_type"],
+                "file_path": node_map[nid]["file_path"],
+                "degree": degrees[nid],
+                "community_id": node_to_comm.get(nid, -1),
+            }
+            for nid in sorted(node_ids, key=lambda x: degrees[x], reverse=True)[:10]
+            if degrees[nid] > 0
+        ]
+
+        bridges = []
+        seen_bridges = set()
+        for e in edges:
+            c1 = node_to_comm.get(e["source_id"], -1)
+            c2 = node_to_comm.get(e["target_id"], -1)
+            if c1 != -1 and c2 != -1 and c1 != c2:
+                pair = (min(c1, c2), max(c1, c2), e["relation_type"])
+                if pair not in seen_bridges:
+                    seen_bridges.add(pair)
+                    bridges.append({
+                        "source": node_map[e["source_id"]]["name"],
+                        "target": node_map[e["target_id"]]["name"],
+                        "relation": e["relation_type"],
+                        "from_community": c1,
+                        "to_community": c2,
+                    })
+
+        return {
+            "communities": community_summaries,
+            "god_nodes": god_nodes,
+            "bridges": bridges[:15],
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+        }
+
+    def export_graph_report(
+        self,
+        topology: Optional[Dict[str, Any]] = None,
+        output_path: Optional[Path] = None,
+    ) -> Path:
+        """Generates Graphify-style GRAPH_REPORT.md for token-optimized codebase orientation."""
+        topo = topology or self.detect_communities_and_god_nodes()
+        out = Path(output_path or (WORKSPACE_DIR / ".agent" / "context" / "GRAPH_REPORT.md")).resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+
+        with self._get_connection() as conn:
+            conf_rows = conn.execute(
+                "SELECT confidence, COUNT(*) FROM code_edges GROUP BY confidence;"
+            ).fetchall()
+            conf_counts = {r[0] or "EXTRACTED": r[1] for r in conf_rows}
+
+        lines = [
+            "# Codebase Knowledge Graph Report (Graphify Engine)",
+            "",
+            "## Summary",
+            f"- **Nodes**: {topo['total_nodes']}",
+            f"- **Edges**: {topo['total_edges']} (`EXTRACTED`: {conf_counts.get('EXTRACTED', 0)}, `INFERRED`: {conf_counts.get('INFERRED', 0)})",
+            f"- **Communities**: {len(topo['communities'])}",
+            "",
+            "## God Nodes (Highest Centrality Hubs)",
+            "| Symbol | Type | File | Degree | Community |",
+            "| :--- | :--- | :--- | :--- | :--- |",
+        ]
+        for g in topo["god_nodes"]:
+            lines.append(
+                f"| `{g['name']}` | {g['node_type']} | `{g['file_path']}` | {g['degree']} | C{g['community_id']} |"
+            )
+
+        lines.extend(["", "## Detected Communities"])
+        for c in topo["communities"][:15]:
+            syms = ", ".join(f"`{s}`" for s in c["top_symbols"]) or "none"
+            files = ", ".join(f"`{f}`" for f in c["files"][:4]) or "none"
+            lines.append(
+                f"- **Community C{c['community_id']}** (size={c['size']}, cohesion={c['cohesion']}): "
+                f"symbols=[{syms}] | files=[{files}]"
+            )
+
+        if topo["bridges"]:
+            lines.extend(["", "## Cross-Community Bridges"])
+            for b in topo["bridges"]:
+                lines.append(
+                    f"- `{b['source']}` (C{b['from_community']}) --[{b['relation']}]--> "
+                    f"`{b['target']}` (C{b['to_community']})"
+                )
+
+        out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return out
+
+    def export_graphify_json(
+        self,
+        topology: Optional[Dict[str, Any]] = None,
+        output_path: Optional[Path] = None,
+    ) -> Path:
+        """Exports compact Graphify graph.json with communities and edge confidence."""
+        topo = topology or self.detect_communities_and_god_nodes()
+        out = Path(output_path or (WORKSPACE_DIR / ".agent" / "context" / "graph.json")).resolve()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        payload = self.export_graph_json()
+        payload["communities"] = topo["communities"]
+        payload["god_nodes"] = topo["god_nodes"]
+        out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        return out
 
     def export_cypher(self, output_path: Optional[Path] = None) -> Path:
         """Exports the SQLite graph as a Cypher script for Neo4j Desktop or AuraDB."""
@@ -500,13 +779,13 @@ class CodeGraphEngine:
         }
 
     def export_graph_json(self) -> Dict[str, Any]:
-        """Exports graph in node-link format for visualization."""
+        """Exports graph in node-link format with community and confidence metadata."""
         with self._get_connection() as conn:
             cur = conn.cursor()
-            cur.execute("SELECT node_id, name, node_type, file_path, start_line, language FROM code_nodes;")
+            cur.execute("SELECT node_id, name, node_type, file_path, start_line, language, community_id, degree FROM code_nodes;")
             nodes = [dict(r) for r in cur.fetchall()]
 
-            cur.execute("SELECT source_id, target_id, relation_type, context FROM code_edges;")
+            cur.execute("SELECT source_id, target_id, relation_type, context, confidence FROM code_edges;")
             edges = [dict(r) for r in cur.fetchall()]
 
         return {"nodes": nodes, "links": edges}
