@@ -82,6 +82,7 @@ class ContextBundler:
         events = mem_mgr.query_events(limit=3)
 
         graph_matches: List[Dict[str, Any]] = []
+        warnings: List[str] = []
         try:
             graph = CodeGraphEngine(db_path=db_path)
             for sym in keywords[:3]:
@@ -92,8 +93,8 @@ class ContextBundler:
                         "definitions": res["definitions"][:2],
                         "callers_count": len(res.get("referenced_by", [])),
                     })
-        except Exception:
-            pass
+        except Exception as exc:
+            warnings.append(f"CodeGraphEngine degraded: {exc}")
 
         routing: Dict[str, Any] = {}
         if WorkflowEngine:
@@ -105,8 +106,8 @@ class ContextBundler:
                     "workflow": ans.get("workflow"),
                     "mode": ans.get("detection_mode"),
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                warnings.append(f"WorkflowEngine degraded: {exc}")
 
         sanitized_memories = []
         for m in memories:
@@ -122,10 +123,15 @@ class ContextBundler:
             "routing": routing,
             "memories": sanitized_memories,
             "recent_events": [
-                {"agent": e.get("agent"), "type": e.get("event_type"), "desc": str(e.get("description", ""))[:120]}
+                {
+                    "agent": e.get("agent"),
+                    "type": e.get("event_type"),
+                    "desc": SecurityGuardrails.sanitize_text(str(e.get("description", "")))[:120],
+                }
                 for e in events
             ],
             "graph_symbols": graph_matches,
+            "warnings": warnings,
         }
 
     @classmethod

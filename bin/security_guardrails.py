@@ -23,7 +23,18 @@ SHIELDED_FILES = {
     "id_rsa",
     "id_dsa",
     "id_ed25519",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    ".git-credentials",
+    "kubeconfig",
 }
+
+SHIELDED_PATH_PARTS = (
+    ".aws/credentials",
+    ".aws/config",
+    ".ssh/config",
+)
 
 SHIELDED_EXTENSIONS = {
     ".pem",
@@ -39,12 +50,17 @@ SECRET_PATTERNS = [
     ("AWS_ACCESS_KEY", re.compile(r"\b(AKIA[0-9A-Z]{16})\b")),
     ("AWS_SECRET_KEY", re.compile(r"(?i)aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?")),
     ("GITHUB_TOKEN", re.compile(r"\b(gh[pousr]_[A-Za-z0-9_]{36,255}|github_pat_[A-Za-z0-9_]{82})\b")),
+    ("OPENAI_KEY", re.compile(r"\b(sk-proj-[A-Za-z0-9_-]{20,})\b")),
+    ("ANTHROPIC_KEY", re.compile(r"\b(sk-ant-[A-Za-z0-9_-]{20,})\b")),
+    ("GOOGLE_API_KEY", re.compile(r"\b(AIza[0-9A-Za-z_-]{35})\b")),
     ("STRIPE_KEY", re.compile(r"\b(sk_live_[0-9a-zA-Z]{24,34})\b")),
     ("SLACK_TOKEN", re.compile(r"\b(xox[baprs]-[0-9a-zA-Z-]{10,72})\b")),
     ("JWT_TOKEN", re.compile(r"\b(eyJ[A-Za-z0-9-_=]{10,}\.eyJ[A-Za-z0-9-_=]{10,}\.[A-Za-z0-9-_.+/=]{10,})\b")),
     ("PRIVATE_KEY_BLOCK", re.compile(r"-----BEGIN [A-Z\s]+PRIVATE KEY-----[\s\S]*?-----END [A-Z\s]+PRIVATE KEY-----")),
     ("DB_CREDENTIAL_URL", re.compile(r"((?:postgres|mysql|mongodb|redis)://[^:]+:)([^@\s]+)(@)")),
 ]
+
+ZERO_WIDTH_RE = re.compile(r"[\u200b\u200c\u200d\ufeff\u00ad]")
 
 # PII signatures
 PII_PATTERNS = [
@@ -68,15 +84,26 @@ class SecurityGuardrails:
 
     @staticmethod
     def is_shielded_file(path_str: str) -> bool:
-        """Returns True if the given file path points to a sensitive/shielded file."""
-        p = Path(path_str)
-        name = p.name.lower()
-        if name in SHIELDED_FILES or name.startswith(".env."):
-            return True
-        if p.suffix.lower() in SHIELDED_EXTENSIONS:
-            return True
-        if "credentials.json" in name or "service-account" in name:
-            return True
+        """Returns True if the given file path or resolved symlink points to a sensitive file."""
+        candidates = [Path(path_str)]
+        try:
+            resolved = candidates[0].resolve()
+            if resolved != candidates[0]:
+                candidates.append(resolved)
+        except Exception:
+            pass
+
+        for p in candidates:
+            name = p.name.lower()
+            norm = str(p).replace("\\", "/").lower()
+            if name in SHIELDED_FILES or name.startswith(".env."):
+                return True
+            if p.suffix.lower() in SHIELDED_EXTENSIONS:
+                return True
+            if "credentials.json" in name or "service-account" in name:
+                return True
+            if any(part in norm for part in SHIELDED_PATH_PARTS):
+                return True
         return False
 
     @classmethod
@@ -130,10 +157,11 @@ class SecurityGuardrails:
 
     @classmethod
     def check_prompt_injection(cls, prompt: str) -> Dict[str, Any]:
-        """Scans user prompts for prompt injection, jailbreak attempts, and token traps."""
+        """Scans user prompts for prompt injection, stripping zero-width obfuscation first."""
+        normalized = ZERO_WIDTH_RE.sub("", prompt)
         detected = []
         for pat in INJECTION_PATTERNS:
-            match = pat.search(prompt)
+            match = pat.search(normalized)
             if match:
                 detected.append(match.group(0))
 

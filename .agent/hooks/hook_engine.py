@@ -51,9 +51,18 @@ DANGEROUS_SHELL_PATTERNS = [
     re.compile(r"(?i)\bgit\s+push\s+.*(--force|-f)\b"),
     re.compile(r"(?i)\bgit\s+reset\s+--hard\s+origin\b"),
     re.compile(r"(?i)\b(mkfs|fdisk|format)\b"),
-    re.compile(r"(?i)\b(cat|type|head|tail|more|less|Get-Content|gc)\s+[^\n]*\.env(\.|$|\s)"),
+    re.compile(r"(?i)(^|[\s/'\"\\])\.env(\.|$|[\s'\"])"),
+    re.compile(r"(?i)(^|[\s/'\"\\])(id_rsa|id_dsa|id_ed25519|\.npmrc|\.pypirc|\.netrc|\.git-credentials|\.aws/credentials)\b"),
     re.compile(r"(?i)\b(printenv|env)\b\s*($|\|)"),
+    re.compile(r"(?i)\$env:[A-Za-z0-9_]+"),
 ]
+
+WRITE_TOOLS = {"write", "edit", "replace", "write_file", "edit_file", "multiedit", "create_file"}
+PROTECTED_GOVERNANCE_PARTS = (
+    ".agent/hooks/",
+    ".claude/settings.json",
+    ".cursor/hooks.json",
+)
 
 FILLER_PHRASES = [
     re.compile(r"(?i)\b(sure!|certainly!|happy to help|hope this helps|let me now)\b"),
@@ -133,20 +142,39 @@ class HookEngine:
         db_path: Optional[Path] = None,
     ) -> Dict[str, Any]:
         """Runs before file read/write or shell execution."""
-        if file_path and SecurityGuardrails.is_shielded_file(file_path):
-            cls._log_hook_event(
-                "HOOK_BLOCKED_SHIELDED_FILE",
-                f"Blocked {tool_name or 'tool'} access to shielded file: {file_path}",
-                {"tool": tool_name, "file": file_path},
-                agent=agent,
-                db_path=db_path,
-            )
-            return {
-                "stage": "pre-tool",
-                "decision": "block",
-                "exit_code": 2,
-                "reason": f"Access to shielded credential file is prohibited: {file_path}",
-            }
+        if file_path:
+            if SecurityGuardrails.is_shielded_file(file_path):
+                cls._log_hook_event(
+                    "HOOK_BLOCKED_SHIELDED_FILE",
+                    f"Blocked {tool_name or 'tool'} access to shielded file: {file_path}",
+                    {"tool": tool_name, "file": file_path},
+                    agent=agent,
+                    db_path=db_path,
+                )
+                return {
+                    "stage": "pre-tool",
+                    "decision": "block",
+                    "exit_code": 2,
+                    "reason": f"Access to shielded credential file is prohibited: {file_path}",
+                }
+
+            norm_file = file_path.replace("\\", "/").lower()
+            is_write = tool_name.strip().lower() in WRITE_TOOLS
+            if is_write and any(part in norm_file for part in PROTECTED_GOVERNANCE_PARTS):
+                if os.environ.get("HYPER_ALLOW_GOVERNANCE_EDIT") != "1":
+                    cls._log_hook_event(
+                        "HOOK_BLOCKED_GOVERNANCE_EDIT",
+                        f"Blocked {tool_name} modification of guardrail file: {file_path}",
+                        {"tool": tool_name, "file": file_path},
+                        agent=agent,
+                        db_path=db_path,
+                    )
+                    return {
+                        "stage": "pre-tool",
+                        "decision": "block",
+                        "exit_code": 2,
+                        "reason": f"Modifying hook/guardrail governance files is prohibited: {file_path}",
+                    }
 
         if command:
             for pat in DANGEROUS_SHELL_PATTERNS:
@@ -205,8 +233,10 @@ class HookEngine:
             if EMOJI_PATTERN.search(text):
                 violations.append(f"Zero-Emoji policy violation in {file_path or 'content'}")
 
-            # Check hardcoded secrets (skip security_guardrails regex definition file)
-            if not p or p.name not in ("security_guardrails.py", ".env.example"):
+            # Check hardcoded secrets (skip only canonical bin/security_guardrails.py and .env.example)
+            norm_path = str(p).replace("\\", "/").lower()
+            is_exempt_def = norm_path.endswith("bin/security_guardrails.py") or p.name == ".env.example"
+            if not p or not is_exempt_def:
                 _, leaks = SecurityGuardrails.mask_secrets(text)
                 if leaks:
                     leak_types = ", ".join(sorted(set(item["type"] for item in leaks)))
@@ -216,7 +246,13 @@ class HookEngine:
             norm = str(p).replace("\\", "/").lower()
             is_rule_file = (
                 p.suffix.lower() in (".md", ".mdc", ".cursorrules")
-                and any(seg in norm for seg in ("/rules/", "global-rules/", "platforms/", "gemini.md", "claude.md"))
+                and any(
+                    seg in norm
+                    for seg in (
+                        "/rules/", "global-rules/", "platforms/",
+                        "gemini.md", "claude.md", "copilot-instructions.md", ".codex/instructions.md",
+                    )
+                )
             )
             if is_rule_file:
                 byte_len = p.stat().st_size if (content is None and p.exists()) else len((text or "").encode("utf-8"))

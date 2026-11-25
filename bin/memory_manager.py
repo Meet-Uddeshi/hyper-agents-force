@@ -326,8 +326,9 @@ class MemoryManager:
                 sql += " AND tags LIKE ?"
                 params.append(f"%{tag}%")
             if search_term:
-                sql += " AND (content LIKE ? OR key LIKE ?)"
-                params.extend([f"%{search_term}%", f"%{search_term}%"])
+                escaped = search_term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                sql += " AND (content LIKE ? ESCAPE '\\' OR key LIKE ? ESCAPE '\\')"
+                params.extend([f"%{escaped}%", f"%{escaped}%"])
 
             sql += " ORDER BY updated_at DESC LIMIT ?"
             params.append(limit)
@@ -393,6 +394,15 @@ class MemoryManager:
 
         synced_invariants = 0
         synced_events = 0
+        quarantined = 0
+
+        try:
+            from bin.security_guardrails import SecurityGuardrails
+        except ImportError:
+            try:
+                from security_guardrails import SecurityGuardrails
+            except ImportError:
+                SecurityGuardrails = None
 
         # 1. Parse ARCHITECTURE_MEMORY.md
         if arch_file.exists():
@@ -404,6 +414,17 @@ class MemoryManager:
             for match in pattern.finditer(content):
                 title = match.group(1).strip()
                 body = match.group(2).strip()
+                if SecurityGuardrails:
+                    chk = SecurityGuardrails.check_prompt_injection(f"{title}\n{body}")
+                    if not chk["is_safe"]:
+                        quarantined += 1
+                        self.log_event(
+                            agent="security-guardrails",
+                            event_type="MEMORY_POISON_QUARANTINED",
+                            description=f"Blocked poisoned invariant from ARCHITECTURE_MEMORY.md: {title}",
+                            payload={"threats": chk["detected_threats"]},
+                        )
+                        continue
                 key = "invariant:" + re.sub(r"[^\w]+", "_", title.lower()).strip("_")
                 self.log_memory(
                     key=key,
@@ -434,6 +455,11 @@ class MemoryManager:
                 scope = m.group(4).strip()
                 status = m.group(5).strip()
                 notes = m.group(6).strip()
+                if SecurityGuardrails:
+                    chk = SecurityGuardrails.check_prompt_injection(f"{scope}\n{notes}")
+                    if not chk["is_safe"]:
+                        quarantined += 1
+                        continue
 
                 self.log_event(
                     agent=agent,
@@ -447,6 +473,7 @@ class MemoryManager:
         return {
             "synced_invariants": synced_invariants,
             "synced_events": synced_events,
+            "quarantined": quarantined,
         }
 
     def sync_to_markdown(self, base_dir: Optional[Path] = None):
