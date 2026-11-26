@@ -29,10 +29,11 @@ This directory contains workspace-wide behavioral guidelines, development standa
 - `requesting-code-review.md` - Pre-merge code review dispatch and checklist enforcement.
 - `receiving-code-review.md` - Objective evaluation, response, and verification of review feedback.
 - `code-reviewer.md` - Specialist code reviewer subagent prompt template.
+- `ponytail.md` - On-demand minimalist cleanup pass to strip unnecessary AI changes, ghost code, and over-engineered abstractions.
 
 ### 6. `standards/`
 - `karpathy-guidelines.md` - Concrete coding discipline to avoid LLM hallucinations, bloat, and regression.
 - `superpowers.md` - Disciplined software engineering standards and adaptive protocol.
 - `using-superpowers.md` - Guidelines for invoking and following superpower methodologies.
 - `caveman.md` - High-efficiency, low-token communication mode for rapid interaction.
-- `ponytail.md` - Minimalist coding standard to eliminate dead code and over-engineered abstractions.
+- `dense-communication.md` - High-efficiency dense response protocol to eliminate filler and ceremony.
